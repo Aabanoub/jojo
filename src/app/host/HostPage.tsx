@@ -6,9 +6,10 @@ import {
   LayoutDashboard, Palette, Lock, Image as ImageIcon, Music, Settings,
   Bell, Edit2, Play, Pause, ChevronDown, RotateCw, Plus, Trash2,
   Save, Check, X, Heart, Menu, ExternalLink, SkipForward, SkipBack,
-  AlertCircle, Globe, Key, Calendar, User, FileText, Volume2,
+  AlertCircle, Globe, Key, Calendar, User, FileText, Volume2, Upload, Copy,
 } from 'lucide-react';
 import { usePortal } from '@/lib/PortalProvider';
+import { uploadFile, BUCKETS, isSupabaseConfigured } from '@/lib/supabase';
 import type { EventVault, OpenWhenEnvelope, PlaylistTrack, Memory } from '@/lib/types';
 import ClientDate from '@/components/ClientDate';
 
@@ -261,6 +262,61 @@ export default function HostPage() {
     await doSave('memory', () => upsertMemory(mem));
     setMemForm({ title: '', memory_date: '', caption: '', image_url: '' });
     setEditMemId(null);
+  };
+
+  // ── CUSTOM ASSETS & UPLOAD HANDLER ─────────────────────────────────────────
+  const [customAssets, setCustomAssets] = useState<Array<{ src: string; label: string }>>([]);
+  const [isUploading, setIsUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem('bibo_custom_assets');
+      if (raw) setCustomAssets(JSON.parse(raw));
+    } catch { /* ignore */ }
+  }, []);
+
+  const addCustomAsset = (asset: { src: string; label: string }) => {
+    setCustomAssets(prev => {
+      const next = [asset, ...prev.filter(a => a.src !== asset.src)];
+      try { localStorage.setItem('bibo_custom_assets', JSON.stringify(next)); } catch { /* ignore */ }
+      return next;
+    });
+  };
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsUploading(true);
+    try {
+      let url = '';
+      if (isSupabaseConfigured) {
+        const ext = file.name.split('.').pop() || 'jpg';
+        const cleanName = `${Date.now()}-${Math.random().toString(36).substring(2, 7)}.${ext}`;
+        const uploadedUrl = await uploadFile(BUCKETS.MEMORIES, cleanName, file);
+        if (uploadedUrl) url = uploadedUrl;
+      }
+
+      if (!url) {
+        url = await new Promise<string>((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(reader.result as string);
+          reader.onerror = reject;
+          reader.readAsDataURL(file);
+        });
+      }
+
+      const newAsset = { src: url, label: file.name };
+      addCustomAsset(newAsset);
+      setMemForm(f => ({ ...f, image_url: url }));
+    } catch (err) {
+      console.error('File upload failed:', err);
+      alert('Upload failed. Please try again.');
+    } finally {
+      setIsUploading(false);
+      if (e.target) e.target.value = '';
+    }
   };
 
   // ── NEW EVENT FORM ────────────────────────────────────────────────────────────
@@ -882,8 +938,23 @@ export default function HostPage() {
                         <FieldRow label="Caption">
                           <DarkInput value={memForm.caption} onChange={(e) => setMemForm(f => ({ ...f, caption: e.target.value }))} placeholder="A short description..." />
                         </FieldRow>
-                        <FieldRow label="Image URL or /images/ path">
-                          <DarkInput value={memForm.image_url} onChange={(e) => setMemForm(f => ({ ...f, image_url: e.target.value }))} placeholder="/images/couple_garden.jpg" />
+                        <FieldRow label="Image (Select from library below, paste URL, or upload)">
+                          <div className="flex gap-2">
+                            <DarkInput
+                              value={memForm.image_url}
+                              onChange={(e) => setMemForm(f => ({ ...f, image_url: e.target.value }))}
+                              placeholder="/images/couple_garden.jpg or https://..."
+                            />
+                            <button
+                              type="button"
+                              onClick={() => fileInputRef.current?.click()}
+                              disabled={isUploading}
+                              className="px-3 py-2 rounded-xl bg-white/10 hover:bg-white/15 border border-white/15 text-xs text-white shrink-0 flex items-center gap-1.5 transition-colors"
+                            >
+                              {isUploading ? <RotateCw size={12} className="animate-spin" /> : <Upload size={12} />}
+                              <span>{isUploading ? 'Uploading...' : 'Upload'}</span>
+                            </button>
+                          </div>
                         </FieldRow>
                         {memForm.image_url && (
                           <div className="w-full h-28 rounded-xl overflow-hidden border border-white/10">
@@ -904,27 +975,95 @@ export default function HostPage() {
                       </div>
                     </Panel>
 
-                    {/* Available Images */}
+                    {/* Interactive Asset Library & Photo Uploader */}
                     <div className="md:col-span-2">
-                      <Panel title="Available Images in /public/images" sub="Asset Library">
-                        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                      <Panel title="Asset Library & Photo Uploader" sub="Available Images">
+                        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mb-2">
+                          <div>
+                            <p className="text-xs text-white/70 font-medium">
+                              Click any photo to immediately select it for your memory, or upload a new photo from your device.
+                            </p>
+                            <p className="text-[10px] text-white/40 mt-0.5">
+                              {isSupabaseConfigured
+                                ? '☁️ Supabase Cloud Storage active: uploaded photos are permanently hosted.'
+                                : '💾 Local Mode active: photos are saved directly to your local library.'}
+                            </p>
+                          </div>
+
+                          <div>
+                            <input
+                              type="file"
+                              ref={fileInputRef}
+                              accept="image/*"
+                              className="hidden"
+                              onChange={handleFileUpload}
+                            />
+                            <button
+                              onClick={() => fileInputRef.current?.click()}
+                              disabled={isUploading}
+                              className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold text-white shadow-md transition-all active:scale-95 disabled:opacity-50 shrink-0"
+                              style={{ background: 'linear-gradient(135deg, #D48C96, #C47D88)' }}
+                            >
+                              {isUploading ? <RotateCw size={13} className="animate-spin" /> : <Upload size={13} />}
+                              {isUploading ? 'Uploading...' : 'Upload New Photo'}
+                            </button>
+                          </div>
+                        </div>
+
+                        {/* Photos Grid */}
+                        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 mt-3">
                           {[
+                            ...customAssets,
                             { src: '/images/couple_portrait.jpg', label: 'couple_portrait.jpg' },
                             { src: '/images/couple_garden.jpg', label: 'couple_garden.jpg' },
                             { src: '/images/couple_winter.jpg', label: 'couple_winter.jpg' },
                             { src: '/images/wax_envelope.jpg', label: 'wax_envelope.jpg' },
-                          ].map((img) => (
-                            <div key={img.src} className="flex flex-col gap-1">
-                              <div className="rounded-xl overflow-hidden h-24 border border-white/10">
-                                <img src={img.src} alt={img.label} className="w-full h-full object-cover" />
+                          ].map((img) => {
+                            const isSelected = memForm.image_url === img.src;
+                            return (
+                              <div
+                                key={img.src}
+                                onClick={() => {
+                                  setMemForm(f => ({ ...f, image_url: img.src }));
+                                }}
+                                className={`group relative flex flex-col gap-1 p-2 rounded-2xl cursor-pointer transition-all border ${
+                                  isSelected
+                                    ? 'border-rose-400 bg-rose-500/15 ring-2 ring-rose-400/50 shadow-lg'
+                                    : 'border-white/10 bg-[#282632] hover:border-white/30 hover:bg-[#302e3b]'
+                                }`}
+                              >
+                                <div className="rounded-xl overflow-hidden h-28 relative">
+                                  <img src={img.src} alt={img.label} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
+                                  {isSelected ? (
+                                    <div className="absolute top-1.5 right-1.5 bg-rose-500 text-white rounded-full p-1 shadow-md">
+                                      <Check size={12} />
+                                    </div>
+                                  ) : (
+                                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                                      <span className="text-[11px] font-semibold text-white px-2 py-1 rounded-lg bg-black/60 backdrop-blur-xs">
+                                        Click to Select
+                                      </span>
+                                    </div>
+                                  )}
+                                </div>
+                                <div className="flex items-center justify-between px-1 mt-1">
+                                  <p className="text-[10px] text-white/60 font-mono truncate max-w-[110px]" title={img.label}>{img.label}</p>
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      navigator.clipboard.writeText(img.src);
+                                      alert(`Copied link to clipboard: ${img.src}`);
+                                    }}
+                                    className="opacity-0 group-hover:opacity-100 transition-opacity p-1 hover:text-rose-400 text-white/40"
+                                    title="Copy Path"
+                                  >
+                                    <Copy size={11} />
+                                  </button>
+                                </div>
                               </div>
-                              <p className="text-[9px] text-white/30 font-mono text-center">{img.label}</p>
-                            </div>
-                          ))}
+                            );
+                          })}
                         </div>
-                        <p className="text-[10px] text-white/30 mt-2">
-                          To add more images, place files in <code className="bg-white/10 px-1 rounded">public/images/</code> and reference them by path.
-                        </p>
                       </Panel>
                     </div>
                   </>
