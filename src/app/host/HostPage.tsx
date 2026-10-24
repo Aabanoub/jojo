@@ -9,7 +9,7 @@ import {
   AlertCircle, Globe, Key, Calendar, User, FileText, Volume2, Upload, Copy,
 } from 'lucide-react';
 import { usePortal } from '@/lib/PortalProvider';
-import { uploadFile, BUCKETS, isSupabaseConfigured } from '@/lib/supabase';
+import { uploadFile, BUCKETS, isSupabaseConfigured, getSupabaseCredentials } from '@/lib/supabase';
 import type { EventVault, OpenWhenEnvelope, PlaylistTrack, Memory } from '@/lib/types';
 import ClientDate from '@/components/ClientDate';
 
@@ -97,6 +97,7 @@ function Panel({ title, sub, children }: { title: string; sub?: string; children
 export default function HostPage() {
   const {
     state,
+    cloudStatus,
     updateSettings,
     upsertEvent,
     deleteEvent,
@@ -110,6 +111,9 @@ export default function HostPage() {
     upsertAsset,
     deleteAsset,
     resetAllData,
+    configureSupabase,
+    testSupabaseConnection,
+    refreshFromCloud,
   } = usePortal();
 
   const { settings, events, envelopes, tracks, memories, signals, assets } = state;
@@ -121,6 +125,14 @@ export default function HostPage() {
   const [saving, setSaving] = useState<string | null>(null); // which section is saving
   const [saved, setSaved] = useState<string | null>(null);
   const [simulateUnlock, setSimulateUnlock] = useState(false);
+
+  // Supabase cloud credentials state
+  const [sbConfig, setSbConfig] = useState(() => getSupabaseCredentials());
+  const [sbUrl, setSbUrl] = useState(sbConfig.url);
+  const [sbKey, setSbKey] = useState(sbConfig.key);
+  const [testingDb, setTestingDb] = useState(false);
+  const [dbTestResult, setDbTestResult] = useState<{ success: boolean; message: string } | null>(null);
+  const [copiedSyncLink, setCopiedSyncLink] = useState(false);
 
   // Check sessionStorage on mount
   useEffect(() => {
@@ -470,9 +482,30 @@ export default function HostPage() {
             >
               Bibo&apos;s Host Studio
             </h1>
-            <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 text-[10px] font-semibold flex items-center gap-1 border border-emerald-500/30">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" /> Live
-            </span>
+            {cloudStatus.isConnected ? (
+              <span
+                className="px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 text-[10px] font-semibold flex items-center gap-1.5 border border-emerald-500/30"
+                title="Connected to Supabase! Multi-device live sync is active."
+              >
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" /> 🟢 Cloud Sync Active
+              </span>
+            ) : cloudStatus.isConfigured ? (
+              <button
+                onClick={() => setActiveNav('settings')}
+                className="px-2.5 py-0.5 rounded-full bg-amber-500/20 text-amber-300 text-[10px] font-semibold flex items-center gap-1.5 border border-amber-500/30 cursor-pointer"
+                title={cloudStatus.error || 'Connecting to Supabase... Click to check settings.'}
+              >
+                <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" /> 🟡 Connecting...
+              </button>
+            ) : (
+              <button
+                onClick={() => setActiveNav('settings')}
+                className="px-2.5 py-0.5 rounded-full bg-rose-500/20 text-rose-300 hover:bg-rose-500/30 text-[10px] font-semibold flex items-center gap-1.5 border border-rose-500/30 cursor-pointer transition-colors"
+                title="Click to connect Supabase database so your changes sync to Jojo's device"
+              >
+                <Globe size={11} /> 🔴 Local Only — Connect Cloud
+              </button>
+            )}
           </div>
 
           {/* Signal alert */}
@@ -1201,6 +1234,144 @@ export default function HostPage() {
                     ════════════════════════════════════════════════════════════ */}
                 {activeNav === 'settings' && (
                   <>
+                    {/* Cloud Database & Multi-Device Sync */}
+                    <div className="md:col-span-2">
+                      <Panel title="Cloud Database & Multi-Device Sync" sub="Supabase Realtime Sync">
+                        <div className="space-y-4">
+                          <div className={`p-4 rounded-xl border flex flex-col md:flex-row items-start md:items-center justify-between gap-3 ${
+                            cloudStatus.isConnected
+                              ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-200'
+                              : cloudStatus.isConfigured
+                              ? 'bg-amber-500/10 border-amber-500/30 text-amber-200'
+                              : 'bg-rose-500/10 border-rose-500/30 text-rose-200'
+                          }`}>
+                            <div>
+                              <p className="text-xs font-semibold flex items-center gap-2">
+                                <Globe size={14} />
+                                {cloudStatus.isConnected
+                                  ? '🟢 Multi-Device Realtime Sync is LIVE'
+                                  : cloudStatus.isConfigured
+                                  ? '🟡 Connecting to Supabase Cloud...'
+                                  : '🔴 Local Storage Mode (Not Synced Across Devices)'}
+                              </p>
+                              <p className="text-[11px] opacity-80 mt-1">
+                                {cloudStatus.isConnected
+                                  ? `All changes made in Bibo's Studio sync instantly to Jojo's phone via Supabase. (Last synced: ${cloudStatus.lastSynced ? cloudStatus.lastSynced.toLocaleTimeString() : 'just now'})`
+                                  : cloudStatus.isConfigured
+                                  ? (cloudStatus.error ? `Error: ${cloudStatus.error}` : 'Verifying connection to your Supabase tables...')
+                                  : "To sync controls between your device and Jojo's phone, connect your Supabase database below."}
+                              </p>
+                            </div>
+                            <div className="flex gap-2 shrink-0">
+                              <button
+                                onClick={async () => {
+                                  setTestingDb(true);
+                                  const res = await testSupabaseConnection();
+                                  setDbTestResult(res);
+                                  setTestingDb(false);
+                                }}
+                                disabled={testingDb}
+                                className="px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-xs font-medium text-white transition-colors flex items-center gap-1.5 cursor-pointer"
+                              >
+                                <RotateCw size={12} className={testingDb ? 'animate-spin' : ''} />
+                                {testingDb ? 'Testing...' : 'Test Connection'}
+                              </button>
+                            </div>
+                          </div>
+
+                          {dbTestResult && (
+                            <div className={`p-3 rounded-xl text-xs border ${
+                              dbTestResult.success
+                                ? 'bg-emerald-500/15 border-emerald-500/30 text-emerald-300'
+                                : 'bg-red-500/15 border-red-500/30 text-red-300'
+                            }`}>
+                              {dbTestResult.success ? '✅ ' : '❌ '}
+                              {dbTestResult.message}
+                            </div>
+                          )}
+
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                            <FieldRow label="Supabase Project URL (e.g. https://xxx.supabase.co)">
+                              <DarkInput
+                                value={sbUrl}
+                                onChange={(e) => setSbUrl(e.target.value)}
+                                placeholder="https://your-project.supabase.co"
+                              />
+                            </FieldRow>
+                            <FieldRow label="Supabase Anon Key (Project Settings -> API)">
+                              <DarkInput
+                                type="password"
+                                value={sbKey}
+                                onChange={(e) => setSbKey(e.target.value)}
+                                placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6..."
+                              />
+                            </FieldRow>
+                          </div>
+
+                          <div className="flex flex-wrap items-center justify-between gap-3 pt-1">
+                            <div className="flex gap-2">
+                              <SaveBtn
+                                onClick={async () => {
+                                  setSaving('sb-config');
+                                  const res = await configureSupabase(sbUrl, sbKey);
+                                  setDbTestResult(res);
+                                  setSaving(null);
+                                  setSaved('sb-config');
+                                  setTimeout(() => setSaved(null), 2000);
+                                }}
+                                saved={saved === 'sb-config'}
+                                label="Save & Connect Supabase"
+                              />
+                              {sbUrl && sbKey && (
+                                <button
+                                  onClick={() => {
+                                    if (confirm('Clear Supabase credentials and revert to local mode?')) {
+                                      configureSupabase('', '');
+                                      setSbUrl('');
+                                      setSbKey('');
+                                    }
+                                  }}
+                                  className="px-3 py-1.5 rounded-xl text-xs text-white/40 hover:text-white/80 cursor-pointer"
+                                >
+                                  Disconnect
+                                </button>
+                              )}
+                            </div>
+
+                            {/* Share link with bootstrap keys */}
+                            {sbUrl && sbKey && (
+                              <button
+                                onClick={() => {
+                                  const url = `${window.location.origin}/?sb_url=${encodeURIComponent(sbUrl)}&sb_key=${encodeURIComponent(sbKey)}`;
+                                  navigator.clipboard.writeText(url);
+                                  setCopiedSyncLink(true);
+                                  setTimeout(() => setCopiedSyncLink(false), 2500);
+                                }}
+                                className="px-3 py-1.5 rounded-xl bg-rose-500/20 text-rose-300 border border-rose-500/30 text-xs font-medium hover:bg-rose-500/30 transition-colors flex items-center gap-1.5 cursor-pointer"
+                              >
+                                <Copy size={12} />
+                                {copiedSyncLink ? '✓ Jojo Sync Link Copied!' : 'Copy Jojo Sync Link (Auto-Connects Her Phone)'}
+                              </button>
+                            )}
+                          </div>
+
+                          <div className="p-3.5 rounded-xl bg-[#282632] border border-white/6 text-[11px] text-white/60 space-y-2">
+                            <p className="font-semibold text-white/90">🚀 For Permanent Global Sync via Vercel:</p>
+                            <p>
+                              Go to your <strong className="text-white">Vercel Dashboard → Project Settings → Environment Variables</strong> and add:
+                            </p>
+                            <div className="font-mono text-[10px] bg-black/40 p-2.5 rounded-lg space-y-1 text-rose-200">
+                              <div>NEXT_PUBLIC_SUPABASE_URL={sbUrl || 'https://your-project.supabase.co'}</div>
+                              <div>NEXT_PUBLIC_SUPABASE_ANON_KEY={sbKey ? `${sbKey.slice(0, 20)}...` : 'your-anon-key'}</div>
+                            </div>
+                            <p className="text-white/50 text-[10px]">
+                              Make sure to also execute the SQL in <code className="bg-white/10 px-1 rounded text-white/80">supabase/schema.sql</code> in your Supabase SQL Editor so all tables and permissions exist.
+                            </p>
+                          </div>
+                        </div>
+                      </Panel>
+                    </div>
+
                     {/* Names & Nicknames */}
                     <Panel title="Names & Nicknames" sub="Settings">
                       <div className="space-y-3">

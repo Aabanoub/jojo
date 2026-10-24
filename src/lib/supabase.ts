@@ -1,15 +1,84 @@
-import { createClient } from '@supabase/supabase-js';
+import { createClient, SupabaseClient } from '@supabase/supabase-js';
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
+// ── Smart Multi-Source Credential Resolution ───────────────────────────────
+// Resolves in this priority order:
+// 1. URL search params (?sb_url=...&sb_key=...) -> automatically saved to localStorage
+// 2. localStorage ('bibo_sb_url' / 'bibo_sb_key') -> set via Host Studio UI
+// 3. process.env (NEXT_PUBLIC_SUPABASE_URL / NEXT_PUBLIC_SUPABASE_ANON_KEY) -> Vercel env
 
-export const isSupabaseConfigured = !!(supabaseUrl && supabaseAnonKey);
+function getActiveUrl(): string {
+  if (typeof window !== 'undefined') {
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const urlParam = params.get('sb_url');
+      if (urlParam) {
+        localStorage.setItem('bibo_sb_url', urlParam);
+        return urlParam;
+      }
+      const stored = localStorage.getItem('bibo_sb_url');
+      if (stored) return stored;
+    } catch { /* ignore */ }
+  }
+  return process.env.NEXT_PUBLIC_SUPABASE_URL || '';
+}
 
-export const supabase = isSupabaseConfigured
-  ? createClient(supabaseUrl, supabaseAnonKey)
+function getActiveKey(): string {
+  if (typeof window !== 'undefined') {
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const keyParam = params.get('sb_key');
+      if (keyParam) {
+        localStorage.setItem('bibo_sb_key', keyParam);
+        return keyParam;
+      }
+      const stored = localStorage.getItem('bibo_sb_key');
+      if (stored) return stored;
+    } catch { /* ignore */ }
+  }
+  return process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
+}
+
+let currentUrl = getActiveUrl();
+let currentKey = getActiveKey();
+
+export let isSupabaseConfigured = !!(currentUrl && currentKey);
+
+export let supabase: SupabaseClient | null = isSupabaseConfigured
+  ? createClient(currentUrl, currentKey)
   : null;
 
-// Storage bucket helpers
+// Reconfigure at runtime (e.g. from Host Studio Settings)
+export function updateSupabaseConfig(url: string, key: string): SupabaseClient | null {
+  currentUrl = url.trim();
+  currentKey = key.trim();
+
+  if (typeof window !== 'undefined') {
+    try {
+      if (currentUrl && currentKey) {
+        localStorage.setItem('bibo_sb_url', currentUrl);
+        localStorage.setItem('bibo_sb_key', currentKey);
+      } else {
+        localStorage.removeItem('bibo_sb_url');
+        localStorage.removeItem('bibo_sb_key');
+      }
+    } catch { /* ignore */ }
+  }
+
+  isSupabaseConfigured = !!(currentUrl && currentKey);
+  supabase = isSupabaseConfigured ? createClient(currentUrl, currentKey) : null;
+  return supabase;
+}
+
+export function getSupabaseCredentials() {
+  return {
+    url: currentUrl,
+    key: currentKey,
+    isConfigured: isSupabaseConfigured,
+    hasEnv: !!(process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY),
+  };
+}
+
+// ── Storage bucket helpers ──────────────────────────────────────────────────
 export const BUCKETS = {
   VAULT_MEDIA: 'vault-media',
   MUSIC: 'music',

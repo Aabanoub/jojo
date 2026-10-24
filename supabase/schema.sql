@@ -40,7 +40,7 @@ create table if not exists public.site_settings (
 -- 2. EVENTS & TIME-LOCKED VAULTS TABLE
 -- -------------------------------------------------------------------------
 create table if not exists public.events_vault (
-  id uuid primary key default uuid_generate_v4(),
+  id text primary key default uuid_generate_v4()::text,
   title text not null,
   subtitle text default 'Live Countdown Timer',
   target_date timestamptz not null,
@@ -59,7 +59,7 @@ create table if not exists public.events_vault (
 -- 3. "OPEN WHEN..." ENVELOPES TABLE
 -- -------------------------------------------------------------------------
 create table if not exists public.open_when_envelopes (
-  id uuid primary key default uuid_generate_v4(),
+  id text primary key default uuid_generate_v4()::text,
   title text not null,
   emoji text not null default '💌',
   letter_content text not null,
@@ -74,7 +74,7 @@ create table if not exists public.open_when_envelopes (
 -- 4. MUSIC PLAYLIST TABLE
 -- -------------------------------------------------------------------------
 create table if not exists public.playlist_tracks (
-  id uuid primary key default uuid_generate_v4(),
+  id text primary key default uuid_generate_v4()::text,
   title text not null,
   artist text not null default 'Bibo & Jojo',
   audio_url text not null,
@@ -87,7 +87,7 @@ create table if not exists public.playlist_tracks (
 -- 5. MEMORY LANE TIMELINE TABLE
 -- -------------------------------------------------------------------------
 create table if not exists public.memories (
-  id uuid primary key default uuid_generate_v4(),
+  id text primary key default uuid_generate_v4()::text,
   title text not null,
   memory_date date not null,
   caption text,
@@ -100,7 +100,7 @@ create table if not exists public.memories (
 -- 6. SIGNALS / REACTIONS FROM JOJO TO BIBO
 -- -------------------------------------------------------------------------
 create table if not exists public.jojo_signals (
-  id uuid primary key default uuid_generate_v4(),
+  id text primary key default uuid_generate_v4()::text,
   signal_type text not null default 'heart',
   message text not null default 'Jojo is thinking of Bibo ❤️',
   is_read boolean not null default false,
@@ -111,7 +111,7 @@ create table if not exists public.jojo_signals (
 -- 7. UPLOADED ASSETS / PHOTO LIBRARY TABLE
 -- -------------------------------------------------------------------------
 create table if not exists public.uploaded_assets (
-  id uuid primary key default uuid_generate_v4(),
+  id text primary key default uuid_generate_v4()::text,
   name text not null,
   url text not null unique,
   created_at timestamptz not null default now()
@@ -179,9 +179,10 @@ create policy "Allow public delete in love app buckets" on storage.objects
 insert into public.site_settings (id) values (1) on conflict (id) do nothing;
 
 -- Events Vault Initial Seed
-insert into public.events_vault (title, subtitle, target_date, is_featured, unlock_method, teaser_clue, vault_letter, vault_media)
+insert into public.events_vault (id, title, subtitle, target_date, is_featured, unlock_method, teaser_clue, vault_letter, vault_media)
 values 
 (
+  'evt-valentine-2027',
   'Valentine''s Day Surprise ❤️',
   'Special Surprise from Bibo to Jojo',
   '2027-02-14T00:00:00+02:00',
@@ -196,6 +197,7 @@ values
   ]'::jsonb
 ),
 (
+  'evt-birthday-jojo',
   'Jojo''s Birthday 🎂',
   'Counting down to Queen Jojo''s Day (30/6)',
   '2027-06-30T00:00:00+03:00',
@@ -207,12 +209,13 @@ values
     {"id": "4", "type": "image", "url": "/images/couple_garden.jpg", "caption": "Queen Jojo"}
   ]'::jsonb
 )
-on conflict do nothing;
+on conflict (id) do nothing;
 
 -- Open When Envelopes Initial Seed
-insert into public.open_when_envelopes (title, emoji, letter_content, media_url, sort_order)
+insert into public.open_when_envelopes (id, title, emoji, letter_content, media_url, sort_order)
 values
 (
+  'env-miss-bibo',
   'Open when you miss Bibo 💌',
   '💌',
   'Whenever you miss me, Jojo, close your eyes and remember that Bibo is thinking about you right now too. Call me or tap the Signal button below so I know! ❤️',
@@ -220,6 +223,7 @@ values
   1
 ),
 (
+  'env-need-smile',
   'Open when you need a smile 😊',
   '😊',
   'Your smile is Bibo''s favorite thing in the entire world, Jojo. Whatever is stressing you out today will pass—I am always right here by your side.',
@@ -227,30 +231,33 @@ values
   2
 ),
 (
+  'env-cant-sleep',
   'Open when you can''t sleep 🌙',
   '🌙',
   'Take a deep breath, put on our favorite music from the player above, and rest easy my Jojo. Tomorrow is a brand new day for us. Sweet dreams ❤️',
   '/images/couple_winter.jpg',
   3
 )
-on conflict do nothing;
+on conflict (id) do nothing;
 
 -- Music Playlist Initial Seed
-insert into public.playlist_tracks (title, artist, audio_url, cover_url, sort_order)
+insert into public.playlist_tracks (id, title, artist, audio_url, cover_url, sort_order)
 values
 (
+  'track-our-song',
   'Our Song — Bibo & Jojo',
   'Bibo & Jojo',
   'https://actions.google.com/sounds/v1/ambiences/gentle_acoustic_guitar.ogg',
   '/images/couple_portrait.jpg',
   1
 )
-on conflict do nothing;
+on conflict (id) do nothing;
 
 -- Memories Timeline Initial Seed
-insert into public.memories (title, memory_date, caption, image_url, sort_order)
+insert into public.memories (id, title, memory_date, caption, image_url, sort_order)
 values
 (
+  'mem-1',
   '15 Sep 2025 — Where It All Began 💕',
   '2025-09-15',
   'Our very first day together. The start of forever.',
@@ -258,21 +265,22 @@ values
   1
 ),
 (
+  'mem-2',
   '24 Dec 2025 — Cozy Winter 🎄',
   '2025-12-24',
   'Warm cocoa, twinkling lights, and you by my side.',
   '/images/couple_winter.jpg',
   2
 )
-on conflict do nothing;
+on conflict (id) do nothing;
 
 -- Uploaded Assets Initial Seed
-insert into public.uploaded_assets (name, url)
+insert into public.uploaded_assets (id, name, url)
 values
-  ('couple_portrait.jpg', '/images/couple_portrait.jpg'),
-  ('couple_garden.jpg', '/images/couple_garden.jpg'),
-  ('couple_winter.jpg', '/images/couple_winter.jpg'),
-  ('wax_envelope.jpg', '/images/wax_envelope.jpg')
+  ('ast-1', 'couple_portrait.jpg', '/images/couple_portrait.jpg'),
+  ('ast-2', 'couple_garden.jpg', '/images/couple_garden.jpg'),
+  ('ast-3', 'couple_winter.jpg', '/images/couple_winter.jpg'),
+  ('ast-4', 'wax_envelope.jpg', '/images/wax_envelope.jpg')
 on conflict (url) do nothing;
 
 -- -------------------------------------------------------------------------

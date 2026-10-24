@@ -88,7 +88,7 @@ export default function CountdownDisplay({ targetDate, label, switcher }: Countd
           className="text-base md:text-lg font-bold text-[#44292E] flex-1 text-center"
           style={{ fontFamily: "'Playfair Display', serif" }}
         >
-          {isZero ? '✨ Anniversary Surprise ✨' : label}
+          {isZero ? `✨ ${label} ✨` : label}
         </h2>
         {isZero && (
           <span className="text-[11px] font-medium text-[#C47D88] shrink-0">
@@ -98,7 +98,7 @@ export default function CountdownDisplay({ targetDate, label, switcher }: Countd
       </div>
 
       {/* Switcher pill if provided */}
-      {switcher && !isZero && (
+      {switcher && (
         <div className="flex justify-center mb-4 mt-1">
           {switcher}
         </div>

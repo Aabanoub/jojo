@@ -29,15 +29,15 @@ export default function VaultCard({ event, accentColor }: VaultCardProps) {
 
   const isTimeReached = new Date().getTime() >= new Date(event.target_date).getTime() || event.force_unlocked || isSimulated;
 
-  const photos = event.vault_media.filter(m => m.type === 'image');
+  const photos = (event.vault_media || []).filter(m => m.type === 'image');
   const displayPhotos = photos.length > 0 ? photos : [
-    { id: '1', type: 'image' as const, url: '/images/couple_portrait.jpg', caption: '15/09/25' },
-    { id: '2', type: 'image' as const, url: '/images/couple_garden.jpg', caption: '25/06/25' },
-    { id: '3', type: 'image' as const, url: '/images/couple_winter.jpg', caption: '24/12/25' },
+    { id: '1', type: 'image' as const, url: '/images/couple_portrait.jpg', caption: 'Surprise_Pic.jpg' },
+    { id: '2', type: 'image' as const, url: '/images/couple_garden.jpg', caption: '15/09/2025' },
+    { id: '3', type: 'image' as const, url: '/images/couple_winter.jpg', caption: '24/12/2025' },
   ];
 
   // ─────────────────────────────────────────────────────────────
-  // 1. LOCKED STATE (Image 4)
+  // 1. LOCKED STATE
   // ─────────────────────────────────────────────────────────────
   if (!isTimeReached && !unlocked) {
     return (
@@ -59,13 +59,13 @@ export default function VaultCard({ event, accentColor }: VaultCardProps) {
         {/* 3 Blurred photo thumbnails with golden Scratch Unlock overlay */}
         <div className="relative w-full h-32 rounded-2xl overflow-hidden flex gap-2 p-1.5 bg-white/20">
           <div className="flex-1 rounded-xl overflow-hidden filter blur-sm">
-            <img src="/images/couple_portrait.jpg" alt="Preview 1" className="w-full h-full object-cover" />
+            <img src={displayPhotos[0]?.url || '/images/couple_portrait.jpg'} alt="Preview 1" className="w-full h-full object-cover" />
           </div>
           <div className="flex-1 rounded-xl overflow-hidden filter blur-sm">
-            <img src="/images/couple_garden.jpg" alt="Preview 2" className="w-full h-full object-cover" />
+            <img src={displayPhotos[1]?.url || '/images/couple_garden.jpg'} alt="Preview 2" className="w-full h-full object-cover" />
           </div>
           <div className="flex-1 rounded-xl overflow-hidden filter blur-sm">
-            <img src="/images/couple_winter.jpg" alt="Preview 3" className="w-full h-full object-cover" />
+            <img src={displayPhotos[2]?.url || '/images/couple_winter.jpg'} alt="Preview 3" className="w-full h-full object-cover" />
           </div>
 
           {/* Golden Scratch & Unlock overlay */}
@@ -127,7 +127,7 @@ export default function VaultCard({ event, accentColor }: VaultCardProps) {
         <div className="relative w-full h-44 rounded-2xl overflow-hidden bg-gradient-to-br from-pink-100 to-amber-100 shadow-inner">
           <div className="absolute inset-0 flex flex-col items-center justify-center text-center p-4">
             <span className="text-3xl mb-1">🎉</span>
-            <p className="text-sm font-semibold text-[#44292E]">Bibo&apos;s Valentine Surprise is Ready!</p>
+            <p className="text-sm font-semibold text-[#44292E]">{event.title} is Ready!</p>
           </div>
           <ScratchVaultCard onReveal={() => setUnlocked(true)} accentColor={accentColor} />
         </div>
@@ -136,11 +136,11 @@ export default function VaultCard({ event, accentColor }: VaultCardProps) {
   }
 
   // ─────────────────────────────────────────────────────────────
-  // 3. UNLOCKED STATE (Image 2)
+  // 3. UNLOCKED STATE
   // ─────────────────────────────────────────────────────────────
   return (
     <div className="space-y-4">
-      {/* Top Banner Card: Celebratory New Valentine's Day Surprise Unlocked! */}
+      {/* Top Banner Card: Celebratory Surprise Unlocked! */}
       <motion.div
         initial={{ scale: 0.95, opacity: 0 }}
         animate={{ scale: 1, opacity: 1 }}
@@ -152,7 +152,6 @@ export default function VaultCard({ event, accentColor }: VaultCardProps) {
           boxShadow: '0 0 30px rgba(235, 190, 160, 0.45)',
         }}
       >
-        {/* Subtle decorative gold sparkle flakes */}
         <div className="absolute top-2 left-4 text-amber-400 opacity-70 text-xs">✨</div>
         <div className="absolute bottom-2 right-4 text-amber-400 opacity-70 text-xs">✨</div>
         <div className="absolute top-3 right-6 text-pink-400 opacity-60 text-xs">🎉</div>
@@ -166,9 +165,8 @@ export default function VaultCard({ event, accentColor }: VaultCardProps) {
               className="text-sm md:text-base font-bold text-[#44292E] leading-snug"
               style={{ fontFamily: "'Playfair Display', serif" }}
             >
-              Celebratory New<br />
-              Valentine&apos;s Day Surprise<br />
-              Unlocked! 🎉
+              Celebratory Surprise<br />
+              {event.title} Unlocked! 🎉
             </h3>
           </div>
         </div>
@@ -194,117 +192,121 @@ export default function VaultCard({ event, accentColor }: VaultCardProps) {
           className="text-xs md:text-sm leading-relaxed text-[#44292E] text-center font-serif-elegant whitespace-pre-line"
           dir="auto"
         >
-          {event.vault_letter || "Happy Valentine's Day, my love!\nEvery moment with you is a dream.\nHere's to us, forever... ❤️"}
+          {event.vault_letter || `Happy ${event.title}, my love!\nEvery moment with you is a dream.\nHere's to us, forever... ❤️`}
         </div>
 
         {/* Voice Note Player Pill inside Letter */}
-        <div
-          className="rounded-2xl p-2.5 px-3 flex items-center justify-between shadow-sm"
-          style={{
-            background: 'rgba(255, 255, 255, 0.65)',
-            border: '1px solid rgba(240, 210, 195, 0.6)',
-          }}
-        >
-          <div className="flex flex-col">
-            <span className="text-[11px] font-medium text-[#44292E]">
-              Voice Note from Bibo — 01:45
-            </span>
-            {/* Visualizer waveform */}
-            <div className="flex items-center gap-0.5 h-3 mt-1">
-              {[3, 6, 12, 8, 14, 10, 16, 7, 11, 5, 9, 4, 13, 8, 6, 4, 10, 6].map((h, i) => (
-                <div
-                  key={i}
-                  className="w-0.5 rounded-full transition-all duration-150"
-                  style={{
-                    height: `${h * 0.7}px`,
-                    background: '#C47D88',
-                    opacity: isPlayingAudio ? 1 : 0.7,
-                  }}
-                />
-              ))}
-            </div>
-          </div>
-
-          <button
+        <div className="flex justify-center pt-1">
+          <div
             onClick={() => setIsPlayingAudio(!isPlayingAudio)}
-            className="w-8 h-8 rounded-full flex items-center justify-center text-white shadow-md transition-transform active:scale-95 shrink-0"
-            style={{ background: 'linear-gradient(135deg, #C47D88, #B06974)' }}
+            className="flex items-center gap-2 px-4 py-2 rounded-full cursor-pointer shadow-xs transition-all hover:scale-105 active:scale-95"
+            style={{
+              background: 'rgba(255, 255, 255, 0.85)',
+              border: '1px solid rgba(240, 205, 210, 0.8)',
+            }}
           >
-            {isPlayingAudio ? <Pause size={14} /> : <Play size={14} className="ml-0.5" />}
-          </button>
+            <div className="w-6 h-6 rounded-full bg-[#D48C96] text-white flex items-center justify-center">
+              {isPlayingAudio ? <Pause size={12} /> : <Play size={12} className="ml-0.5" />}
+            </div>
+            <span className="text-xs font-semibold text-[#5D3A42]">Voice Note</span>
+            <span className="text-[10px] text-[#8C6B72]">0:45</span>
+          </div>
         </div>
       </motion.div>
 
-      {/* 2-Column Grid: Uploaded Event Material + Surprise Coupon */}
-      <div className="grid grid-cols-2 gap-3">
-        {/* Left Column: Uploaded Event Material */}
-        <div
-          className="rounded-3xl p-3 shadow-sm flex flex-col justify-between"
-          style={{
-            background: 'rgba(255, 255, 255, 0.55)',
-            backdropFilter: 'blur(16px)',
-            border: '1px solid rgba(255, 255, 255, 0.7)',
-          }}
-        >
-          <h5 className="text-[11px] font-semibold text-center text-[#44292E] mb-2">
-            Uploaded Event Material
-          </h5>
-
-          {/* Polaroid carousel */}
-          <div className="relative w-full aspect-square rounded-2xl overflow-hidden p-1.5 bg-white shadow-inner flex flex-col items-center">
-            <img
-              src={displayPhotos[currentPhotoIdx]?.url || '/images/couple_portrait.jpg'}
-              alt="Material"
-              className="w-full h-[78%] object-cover rounded-xl"
-            />
-            <span className="text-[9px] font-mono text-gray-500 mt-1">
-              {displayPhotos[currentPhotoIdx]?.caption || '15/09/25'}
-            </span>
-
-            {/* Arrows */}
-            <button
-              onClick={() => setCurrentPhotoIdx((prev) => (prev - 1 + displayPhotos.length) % displayPhotos.length)}
-              className="absolute left-1 top-1/2 -translate-y-1/2 w-5 h-5 rounded-full bg-white/80 flex items-center justify-center shadow-sm text-gray-600 hover:bg-white"
-            >
-              <ChevronLeft size={12} />
-            </button>
-            <button
-              onClick={() => setCurrentPhotoIdx((prev) => (prev + 1) % displayPhotos.length)}
-              className="absolute right-1 top-1/2 -translate-y-1/2 w-5 h-5 rounded-full bg-white/80 flex items-center justify-center shadow-sm text-gray-600 hover:bg-white"
-            >
-              <ChevronRight size={12} />
-            </button>
-          </div>
+      {/* Polaroid Memories Carousel */}
+      <motion.div
+        initial={{ y: 20, opacity: 0 }}
+        animate={{ y: 0, opacity: 1 }}
+        transition={{ delay: 0.2 }}
+        className="rounded-3xl p-5 shadow-sm relative overflow-hidden"
+        style={{
+          background: 'rgba(255, 255, 255, 0.55)',
+          backdropFilter: 'blur(16px)',
+          border: '1px solid rgba(255, 255, 255, 0.7)',
+        }}
+      >
+        <div className="flex items-center justify-between mb-3">
+          <h4
+            className="text-xs font-bold text-[#44292E]"
+            style={{ fontFamily: "'Playfair Display', serif" }}
+          >
+            Our Moments Together
+          </h4>
+          <span className="text-[10px] text-[#7A5B61]">
+            {currentPhotoIdx + 1} / {displayPhotos.length}
+          </span>
         </div>
 
-        {/* Right Column: Surprise Coupon */}
-        <div
-          className="rounded-3xl p-3 shadow-sm flex flex-col justify-between"
-          style={{
-            background: 'rgba(255, 255, 255, 0.55)',
-            backdropFilter: 'blur(16px)',
-            border: '1px solid rgba(255, 255, 255, 0.7)',
-          }}
-        >
-          <h5 className="text-[11px] font-semibold text-center text-[#44292E] mb-2">
-            Surprise Coupon
-          </h5>
-
-          {/* Ticket style coupon */}
-          <div className="relative w-full aspect-square rounded-2xl p-2.5 border-2 border-dashed border-amber-300 bg-amber-50/70 flex flex-col items-center justify-center text-center shadow-sm">
-            <Gift size={20} className="text-amber-500 mb-1" />
-            <span
-              className="text-[11px] font-bold text-[#553311] leading-tight"
-              style={{ fontFamily: "'Playfair Display', serif" }}
+        <div className="relative">
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={currentPhotoIdx}
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              transition={{ duration: 0.25 }}
+              className="bg-white p-3 pb-6 rounded-2xl shadow-md mx-auto max-w-xs"
+              style={{ transform: 'rotate(-1deg)' }}
             >
-              1 Special Valentine<br />Date Night
-            </span>
-            <span className="text-[8px] text-amber-700/60 mt-1">
-              ✨ Redeemable anytime ✨
-            </span>
-          </div>
+              <div className="w-full h-64 rounded-xl overflow-hidden bg-pink-50">
+                <img
+                  src={displayPhotos[currentPhotoIdx]?.url || '/images/couple_portrait.jpg'}
+                  alt={displayPhotos[currentPhotoIdx]?.caption || 'Couple memory'}
+                  className="w-full h-full object-cover"
+                />
+              </div>
+              <p
+                className="text-xs text-center text-[#5D3A42] font-mono mt-3"
+                dir="auto"
+              >
+                {displayPhotos[currentPhotoIdx]?.caption || 'Special Memory 💕'}
+              </p>
+            </motion.div>
+          </AnimatePresence>
+
+          {displayPhotos.length > 1 && (
+            <>
+              <button
+                onClick={() => setCurrentPhotoIdx((prev) => (prev - 1 + displayPhotos.length) % displayPhotos.length)}
+                className="absolute left-1 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-white/90 shadow-md flex items-center justify-center text-[#44292E] hover:bg-white transition-all active:scale-95"
+              >
+                <ChevronLeft size={16} />
+              </button>
+              <button
+                onClick={() => setCurrentPhotoIdx((prev) => (prev + 1) % displayPhotos.length)}
+                className="absolute right-1 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-white/90 shadow-md flex items-center justify-center text-[#44292E] hover:bg-white transition-all active:scale-95"
+              >
+                <ChevronRight size={16} />
+              </button>
+            </>
+          )}
         </div>
-      </div>
+      </motion.div>
+
+      {/* Love Coupon Box */}
+      <motion.div
+        initial={{ y: 20, opacity: 0 }}
+        animate={{ y: 0, opacity: 1 }}
+        transition={{ delay: 0.3 }}
+        className="rounded-3xl p-5 shadow-sm text-center relative overflow-hidden"
+        style={{
+          background: 'linear-gradient(135deg, rgba(255, 235, 240, 0.8), rgba(255, 245, 235, 0.8))',
+          backdropFilter: 'blur(16px)',
+          border: '1.5px dashed rgba(212, 140, 150, 0.6)',
+        }}
+      >
+        <div className="flex items-center justify-center gap-1.5 mb-1 text-[#8C4A55]">
+          <Gift size={14} />
+          <span className="text-[11px] font-bold uppercase tracking-wider">Love Coupon from Bibo</span>
+        </div>
+        <h4 className="text-base font-bold text-[#44292E] font-script">
+          Redeemable: One Lifetime of Unconditional Love & Hugs
+        </h4>
+        <p className="text-[10px] text-[#7A5B61] mt-1">
+          No expiration date • Valid anywhere in the universe 🌟
+        </p>
+      </motion.div>
     </div>
   );
 }

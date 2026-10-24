@@ -24,11 +24,30 @@ export default function JojoPage() {
   const [showPingSuccess, setShowPingSuccess] = useState(false);
   const [togetherStr, setTogetherStr] = useState('');
 
-  // Find featured event
+  // Find featured event or fallback to first
   const featuredEvent = events.find(e => e.is_featured) || events[0];
-  const selectedEvent = events[selectedEventIdx] || featuredEvent;
+  const selectedEvent = events[selectedEventIdx] || featuredEvent || {
+    id: 'evt-default',
+    title: "Valentine's Day Surprise ❤️",
+    subtitle: 'Special Surprise from Bibo to Jojo',
+    target_date: '2027-02-14T00:00:00+02:00',
+    is_featured: true,
+    unlock_method: 'scratch' as const,
+    event_password: settings.master_password,
+    force_unlocked: false,
+    teaser_clue: 'Something special from Bibo is waiting for you inside...',
+    vault_letter: '',
+    vault_media: [],
+    created_at: new Date().toISOString(),
+  };
 
-  // Together since counter
+  // Format relationship start date dynamically
+  const startDate = new Date(settings.relationship_start);
+  const formattedTogetherDate = !isNaN(startDate.getTime())
+    ? `${String(startDate.getDate()).padStart(2, '0')}·${String(startDate.getMonth() + 1).padStart(2, '0')}·${startDate.getFullYear()}`
+    : '15·09·2025';
+
+  // Live together-since counter
   useEffect(() => {
     const update = () => {
       const start = new Date(settings.relationship_start).getTime();
@@ -49,26 +68,26 @@ export default function JojoPage() {
   }, [settings.relationship_start]);
 
   const quickSignals = [
-    'Missing Bibo ❤️',
-    'Thinking of you Bibo ✨',
+    `Missing ${settings.his_nickname || 'Bibo'} ❤️`,
+    `Thinking of you ${settings.his_nickname || 'Bibo'} ✨`,
     'Wish you were here 🥺',
-    'I love you Bibo 💕',
+    `I love you ${settings.his_nickname || 'Bibo'} 💕`,
   ];
 
   const handleSendPing = async (message: string) => {
     await sendSignal({ signal_type: 'heart', message });
     setShowPingSuccess(true);
     setPingMessage('');
-    setTimeout(() => setShowPingSuccess(false), 2000);
+    setTimeout(() => setShowPingSuccess(false), 2500);
   };
 
   return (
     <div
-      className="min-h-screen relative overflow-x-hidden"
+      className="min-h-screen relative overflow-x-hidden transition-colors duration-500"
       style={{
-        background: 'linear-gradient(175deg, #F8DCDA 0%, #F4CBC8 40%, #EFC0BD 100%)',
-        color: '#44292E',
-        fontFamily: "'Inter', 'Cairo', sans-serif",
+        background: `linear-gradient(175deg, ${settings.bg_primary || '#F8DCDA'} 0%, ${settings.bg_secondary || '#EFC0BD'} 100%)`,
+        color: settings.text_primary || '#44292E',
+        fontFamily: `'${settings.body_font || 'Inter'}', 'Cairo', sans-serif`,
       }}
     >
       {/* Dynamic Particle atmosphere layer */}
@@ -81,7 +100,7 @@ export default function JojoPage() {
       <main className="relative z-10 max-w-md mx-auto px-4 pb-28 pt-4">
 
         {/* ─────────────────────────────────────────────────────────────
-            TAB 1: HOME VIEW (Image 4)
+            TAB 1: HOME VIEW
            ───────────────────────────────────────────────────────────── */}
         {activeTab === 'home' && (
           <motion.div
@@ -90,25 +109,28 @@ export default function JojoPage() {
             exit={{ opacity: 0 }}
             className="space-y-4"
           >
-            {/* Header: Bibo & Jojo ✨ + Together Badge */}
+            {/* Header: Portal Title + Together Badge */}
             <header className="pt-1">
               <h1
-                className="text-2xl font-bold tracking-tight text-[#44292E]"
-                style={{ fontFamily: "'Playfair Display', serif" }}
+                className="text-2xl font-bold tracking-tight"
+                style={{
+                  fontFamily: `'${settings.heading_font || 'Playfair Display'}', serif`,
+                  color: settings.text_primary || '#44292E',
+                }}
               >
-                Bibo & Jojo <span className="text-amber-400 text-lg">✨</span>
+                {settings.portal_title || `${settings.his_nickname || 'Bibo'} & ${settings.her_nickname || 'Jojo'}`} <span className="text-amber-400 text-lg">✨</span>
               </h1>
               <button
                 onClick={() => setShowTogetherDetail(!showTogetherDetail)}
-                className="mt-1.5 inline-flex items-center gap-1.5 text-[11px] px-3 py-1 rounded-full shadow-xs transition-all"
+                className="mt-1.5 inline-flex items-center gap-1.5 text-[11px] px-3 py-1 rounded-full shadow-xs transition-all cursor-pointer"
                 style={{
                   background: 'rgba(255, 255, 255, 0.65)',
                   border: '1px solid rgba(255, 255, 255, 0.8)',
-                  color: '#6E454E',
+                  color: settings.text_primary || '#6E454E',
                 }}
               >
                 <Clock size={11} className="text-[#C47D88]" />
-                Together Since 15·09·2025
+                Together Since {formattedTogetherDate}
                 <ChevronDown
                   size={11}
                   className="transition-transform"
@@ -148,8 +170,11 @@ export default function JojoPage() {
               }}
             >
               <div className="flex items-center justify-between mb-1.5">
-                <span className="text-xs font-semibold text-[#44292E]">
-                  Daily Note from Bibo 💌 :
+                <span
+                  className="text-xs font-semibold"
+                  style={{ color: settings.text_primary || '#44292E' }}
+                >
+                  {settings.daily_note_title || `Daily Note from ${settings.his_nickname || 'Bibo'} 💌 :`}
                 </span>
                 <ClientDate
                   date={settings.daily_note_updated_at}
@@ -157,14 +182,15 @@ export default function JojoPage() {
                 />
               </div>
               <p
-                className="text-sm md:text-base leading-relaxed text-[#44292E] font-script"
+                className="text-sm md:text-base leading-relaxed font-script"
+                style={{ color: settings.text_primary || '#44292E' }}
                 dir="auto"
               >
                 {settings.daily_note_content}
               </p>
             </section>
 
-            {/* Card 2: Valentine's Day Surprise Hero Countdown */}
+            {/* Card 2: Hero Countdown */}
             <section
               className="rounded-3xl p-4 md:p-5 shadow-sm glow-card relative overflow-hidden"
               style={{
@@ -173,19 +199,18 @@ export default function JojoPage() {
                 border: '1.5px solid rgba(240, 205, 175, 0.75)',
               }}
             >
-              {/* Event switcher pill if more than 1 event */}
               <CountdownDisplay
                 targetDate={selectedEvent.target_date}
                 label={selectedEvent.title}
                 accentColor={settings.accent_color}
                 switcher={
                   events.length > 1 ? (
-                    <div className="flex gap-1.5">
+                    <div className="flex gap-1.5 flex-wrap justify-center">
                       {events.map((evt, idx) => (
                         <button
                           key={evt.id}
                           onClick={() => setSelectedEventIdx(idx)}
-                          className="text-[10px] px-3 py-1 rounded-full transition-all shadow-xs"
+                          className="text-[10px] px-3 py-1 rounded-full transition-all shadow-xs cursor-pointer"
                           style={{
                             background: idx === selectedEventIdx ? 'rgba(255, 255, 255, 0.95)' : 'rgba(255, 255, 255, 0.4)',
                             color: idx === selectedEventIdx ? '#44292E' : '#7A5B61',
@@ -193,7 +218,7 @@ export default function JojoPage() {
                             fontWeight: idx === selectedEventIdx ? 600 : 500,
                           }}
                         >
-                          {evt.title.includes('Birthday') ? "Jojo's Birthday 🎂 30/6" : evt.title}
+                          {evt.title}
                         </button>
                       ))}
                     </div>
@@ -202,27 +227,46 @@ export default function JojoPage() {
               />
             </section>
 
-            {/* Card 3: Locked Digital Vault */}
+            {/* Card 3: Digital Vault */}
             <section>
               <VaultCard event={selectedEvent} accentColor={settings.accent_color} />
             </section>
 
-            {/* Card 4: Open When... Envelopes in 2-Column Grid */}
-            <section className="grid grid-cols-2 gap-3 pt-1">
-              {envelopes.slice(0, 2).map((env) => (
-                <EnvelopeCard
-                  key={env.id}
-                  envelope={env}
-                  accentColor={settings.accent_color}
-                  compact={true}
-                />
-              ))}
+            {/* Card 4: Open When Envelopes in Grid */}
+            <section className="space-y-2 pt-1">
+              <div className="flex items-center justify-between px-1">
+                <h3
+                  className="text-xs font-bold"
+                  style={{ fontFamily: `'${settings.heading_font || 'Playfair Display'}', serif` }}
+                >
+                  Open When...
+                </h3>
+                {envelopes.length > 2 && (
+                  <button
+                    onClick={() => setActiveTab('envelopes')}
+                    className="text-[10px] text-[#C47D88] hover:underline font-medium"
+                  >
+                    View All ({envelopes.length}) →
+                  </button>
+                )}
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                {envelopes.slice(0, 4).map((env) => (
+                  <EnvelopeCard
+                    key={env.id}
+                    envelope={env}
+                    accentColor={settings.accent_color}
+                    masterPassword={settings.master_password}
+                    compact={true}
+                  />
+                ))}
+              </div>
             </section>
           </motion.div>
         )}
 
         {/* ─────────────────────────────────────────────────────────────
-            TAB 2: VAULT VIEW (Image 2)
+            TAB 2: VAULT VIEW
            ───────────────────────────────────────────────────────────── */}
         {activeTab === 'vault' && (
           <motion.div
@@ -231,17 +275,22 @@ export default function JojoPage() {
             exit={{ opacity: 0 }}
             className="space-y-4"
           >
-            {/* Header: Our Space ✨ */}
             <header className="pt-1">
               <h1
-                className="text-2xl font-bold tracking-tight text-[#44292E]"
-                style={{ fontFamily: "'Playfair Display', serif" }}
+                className="text-2xl font-bold tracking-tight"
+                style={{
+                  fontFamily: `'${settings.heading_font || 'Playfair Display'}', serif`,
+                  color: settings.text_primary || '#44292E',
+                }}
               >
-                Our Space <span className="text-amber-400 text-lg">✨</span>
+                Digital Vault <span className="text-amber-400 text-lg">✨</span>
               </h1>
+              <p className="text-xs text-[#7A5B61] mt-0.5">
+                Special surprises and locked letters prepared by {settings.his_nickname || 'Bibo'}
+              </p>
             </header>
 
-            {/* Countdown timer card showing 00:00:00 */}
+            {/* Event Countdown Card */}
             <section
               className="rounded-3xl p-4 shadow-sm"
               style={{
@@ -251,62 +300,110 @@ export default function JojoPage() {
               }}
             >
               <CountdownDisplay
-                targetDate={new Date(Date.now() - 1000).toISOString()}
-                label="Anniversary Surprise"
+                targetDate={selectedEvent.target_date}
+                label={selectedEvent.title}
                 accentColor={settings.accent_color}
+                switcher={
+                  events.length > 1 ? (
+                    <div className="flex gap-1.5 flex-wrap justify-center mt-2">
+                      {events.map((evt, idx) => (
+                        <button
+                          key={evt.id}
+                          onClick={() => setSelectedEventIdx(idx)}
+                          className="text-[10px] px-3 py-1 rounded-full transition-all shadow-xs cursor-pointer"
+                          style={{
+                            background: idx === selectedEventIdx ? 'rgba(255, 255, 255, 0.95)' : 'rgba(255, 255, 255, 0.4)',
+                            color: idx === selectedEventIdx ? '#44292E' : '#7A5B61',
+                            border: '1px solid rgba(255, 255, 255, 0.7)',
+                            fontWeight: idx === selectedEventIdx ? 600 : 500,
+                          }}
+                        >
+                          {evt.title}
+                        </button>
+                      ))}
+                    </div>
+                  ) : null
+                }
               />
             </section>
 
-            {/* Unlocked Vault Material, Secret Letter, Polaroids, Coupon */}
+            {/* Vault Content Card */}
             <section>
-              <VaultCard event={{ ...selectedEvent, force_unlocked: true }} accentColor={settings.accent_color} />
+              <VaultCard event={selectedEvent} accentColor={settings.accent_color} />
             </section>
           </motion.div>
         )}
 
         {/* ─────────────────────────────────────────────────────────────
-            TAB 3 & 4: ENVELOPES & MEMORIES (Image 3)
+            TAB 3: ENVELOPES VIEW
            ───────────────────────────────────────────────────────────── */}
-        {(activeTab === 'envelopes' || activeTab === 'memories') && (
+        {activeTab === 'envelopes' && (
           <motion.div
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0 }}
             className="space-y-4"
           >
-            {/* Header: Envelopes & Memories + For Jojo 💕 */}
             <header className="pt-1">
               <h1
-                className="text-2xl font-bold tracking-tight text-[#44292E]"
-                style={{ fontFamily: "'Playfair Display', serif" }}
+                className="text-2xl font-bold tracking-tight"
+                style={{
+                  fontFamily: `'${settings.heading_font || 'Playfair Display'}', serif`,
+                  color: settings.text_primary || '#44292E',
+                }}
               >
-                Envelopes & Memories
+                Open When Envelopes
               </h1>
               <p className="text-sm text-[#C47D88] font-script mt-0.5 font-bold">
-                For Jojo 💕
+                For {settings.her_nickname || 'Jojo'} 💕
               </p>
             </header>
 
-            {/* Card 1: Open when you miss Bibo Wax Seal Envelope */}
-            <section>
-              <EnvelopeCard
-                envelope={envelopes[0] || {
-                  id: 'env-default',
-                  title: 'Open when you miss Bibo 💌',
-                  emoji: '💌',
-                  letter_content: 'My dearest Jojo,\nwhenever you miss me,\ntap the Signal button\nbelow so I know!\n\nLove, Bibo ❤️',
-                  media_url: '/images/wax_envelope.jpg',
-                  audio_url: null,
-                  requires_password: false,
-                  sort_order: 1,
-                  created_at: '2025-09-15T12:00:00.000Z',
-                }}
-                accentColor={settings.accent_color}
-                compact={false}
-              />
+            {/* Envelopes list */}
+            <section className="space-y-3">
+              {envelopes.map((env) => (
+                <EnvelopeCard
+                  key={env.id}
+                  envelope={env}
+                  accentColor={settings.accent_color}
+                  masterPassword={settings.master_password}
+                  compact={false}
+                />
+              ))}
+              {envelopes.length === 0 && (
+                <div className="text-center py-8 text-xs text-[#7A5B61]">
+                  No envelopes yet from {settings.his_nickname || 'Bibo'}.
+                </div>
+              )}
             </section>
+          </motion.div>
+        )}
 
-            {/* Card 2: Memory Lane Polaroid Timeline */}
+        {/* ─────────────────────────────────────────────────────────────
+            TAB 4: MEMORIES VIEW
+           ───────────────────────────────────────────────────────────── */}
+        {activeTab === 'memories' && (
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0 }}
+            className="space-y-4"
+          >
+            <header className="pt-1">
+              <h1
+                className="text-2xl font-bold tracking-tight"
+                style={{
+                  fontFamily: `'${settings.heading_font || 'Playfair Display'}', serif`,
+                  color: settings.text_primary || '#44292E',
+                }}
+              >
+                Our Memory Lane
+              </h1>
+              <p className="text-sm text-[#C47D88] font-script mt-0.5 font-bold">
+                Moments we cherish forever 💕
+              </p>
+            </header>
+
             <section>
               <MemoryLane memories={memories} accentColor={settings.accent_color} />
             </section>
@@ -314,7 +411,7 @@ export default function JojoPage() {
         )}
 
         {/* ─────────────────────────────────────────────────────────────
-            TAB 5: PING BIBO MODAL
+            TAB 5: PING MODAL
            ───────────────────────────────────────────────────────────── */}
         <AnimatePresence>
           {activeTab === 'ping' && (
@@ -338,20 +435,20 @@ export default function JojoPage() {
                 <div className="flex items-center justify-between mb-3">
                   <h3
                     className="text-base font-bold text-[#44292E]"
-                    style={{ fontFamily: "'Playfair Display', serif" }}
+                    style={{ fontFamily: `'${settings.heading_font || 'Playfair Display'}', serif` }}
                   >
-                    Ping Bibo ❤️
+                    Ping {settings.his_nickname || 'Bibo'} ❤️
                   </h3>
                   <button
                     onClick={() => setActiveTab('home')}
-                    className="w-6 h-6 rounded-full bg-white/70 flex items-center justify-center text-xs text-gray-500"
+                    className="w-6 h-6 rounded-full bg-white/70 flex items-center justify-center text-xs text-gray-500 cursor-pointer"
                   >
                     ✕
                   </button>
                 </div>
 
                 <p className="text-xs text-[#7A5B61] mb-3">
-                  Send a love signal right to Bibo&apos;s Host Studio:
+                  Send a love signal right to {settings.his_nickname || 'Bibo'}&apos;s Studio:
                 </p>
 
                 <div className="grid grid-cols-2 gap-2 mb-3">
@@ -359,7 +456,7 @@ export default function JojoPage() {
                     <button
                       key={sig}
                       onClick={() => handleSendPing(sig)}
-                      className="text-xs p-2.5 rounded-xl text-left transition-all shadow-xs hover:shadow-sm"
+                      className="text-xs p-2.5 rounded-xl text-left transition-all shadow-xs hover:shadow-sm cursor-pointer"
                       style={{
                         background: 'rgba(255, 255, 255, 0.85)',
                         border: '1px solid rgba(240, 210, 215, 0.8)',
@@ -376,13 +473,13 @@ export default function JojoPage() {
                     value={pingMessage}
                     onChange={(e) => setPingMessage(e.target.value)}
                     onKeyDown={(e) => e.key === 'Enter' && pingMessage && handleSendPing(pingMessage)}
-                    placeholder="Write a custom note to Bibo..."
+                    placeholder={`Write a custom note to ${settings.his_nickname || 'Bibo'}...`}
                     dir="auto"
                     className="flex-1 px-3 py-2 rounded-xl text-xs bg-white/90 border border-pink-200 outline-none text-[#44292E]"
                   />
                   <button
                     onClick={() => pingMessage && handleSendPing(pingMessage)}
-                    className="p-2.5 rounded-xl text-white shadow-sm shrink-0"
+                    className="p-2.5 rounded-xl text-white shadow-sm shrink-0 cursor-pointer"
                     style={{ background: 'linear-gradient(135deg, #C47D88, #B06974)' }}
                   >
                     <Send size={14} />
@@ -395,7 +492,7 @@ export default function JojoPage() {
                     animate={{ opacity: 1, y: 0 }}
                     className="text-xs mt-2 text-center text-pink-600 font-medium"
                   >
-                    ✨ Love signal sent to Bibo! He&apos;ll see it right now 💕
+                    ✨ Love signal sent to {settings.his_nickname || 'Bibo'}! He&apos;ll see it right now 💕
                   </motion.p>
                 )}
               </motion.div>
@@ -409,13 +506,13 @@ export default function JojoPage() {
             href="/host"
             className="inline-flex items-center gap-1.5 text-[11px] text-[#44292E]/40 hover:text-[#44292E]/80 transition-colors px-3 py-1.5 rounded-full hover:bg-white/40"
           >
-            <span>🔒</span> Bibo&apos;s Host Studio
+            <span>🔒</span> {settings.his_nickname || 'Bibo'}&apos;s Host Studio
           </a>
         </div>
       </main>
 
       {/* ─────────────────────────────────────────────────────────────
-          BOTTOM NAVIGATION BAR (Matches Image 2, 3, 4)
+          BOTTOM NAVIGATION BAR
          ───────────────────────────────────────────────────────────── */}
       <nav
         className="fixed bottom-0 left-0 right-0 z-40"
@@ -432,14 +529,14 @@ export default function JojoPage() {
             { id: 'vault' as TabId, icon: Lock, label: 'Vault' },
             { id: 'envelopes' as TabId, icon: Mail, label: 'Envelopes' },
             { id: 'memories' as TabId, icon: Camera, label: 'Memories' },
-            { id: 'ping' as TabId, icon: Heart, label: 'Send Signal' },
+            { id: 'ping' as TabId, icon: Heart, label: 'Signal' },
           ]).map((tab) => {
-            const isActive = activeTab === tab.id || (tab.id === 'envelopes' && activeTab === 'memories');
+            const isActive = activeTab === tab.id;
             return (
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
-                className={`flex flex-col items-center gap-1 py-1 px-3 rounded-2xl transition-all relative ${
+                className={`flex flex-col items-center gap-1 py-1 px-3 rounded-2xl transition-all relative cursor-pointer ${
                   isActive ? 'text-[#8E4450]' : 'text-[#8C6B72] hover:text-[#5E3B42]'
                 }`}
               >
