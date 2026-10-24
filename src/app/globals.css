@@ -1,0 +1,52 @@
+@import "tailwindcss";
+
+:root {
+  --bg-primary: #F8DCDA;
+  --bg-secondary: #F2C4C1;
+  --text-primary: #44292E;
+  --accent-color: #D48C96;
+  --card-bg: rgba(255, 255, 255, 0.45);
+  --font-heading: 'Playfair Display', 'Cairo', serif;
+  --font-body: 'Inter', 'Cairo', 'Noto Sans Arabic', sans-serif;
+  --font-script: 'Dancing Script', 'Caveat', cursive;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  overflow-x: hidden;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Custom fonts */
+.font-script {
+  font-family: 'Dancing Script', 'Caveat', cursive;
+}
+
+.font-serif-elegant {
+  font-family: 'Playfair Display', 'Cormorant Garamond', serif;
+}
+
+/* Glowing card borders */
+.glow-card {
+  box-shadow: 0 0 25px rgba(235, 180, 165, 0.35), 0 8px 30px rgba(0, 0, 0, 0.04);
+}
+
+.glow-gold {
+  box-shadow: 0 0 30px rgba(220, 175, 110, 0.45), 0 8px 30px rgba(0, 0, 0, 0.06);
+}
+
+/* Hide scrollbar */
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
