@@ -264,23 +264,62 @@ export default function HostPage() {
     setEditMemId(null);
   };
 
-  // ── CUSTOM ASSETS & UPLOAD HANDLER ─────────────────────────────────────────
-  const [customAssets, setCustomAssets] = useState<Array<{ src: string; label: string }>>([]);
+  // ── ASSET LIBRARY & UPLOAD / DELETE HANDLERS ───────────────────────────────
+  const DEFAULT_ASSETS = [
+    { src: '/images/couple_portrait.jpg', label: 'couple_portrait.jpg' },
+    { src: '/images/couple_garden.jpg', label: 'couple_garden.jpg' },
+    { src: '/images/couple_winter.jpg', label: 'couple_winter.jpg' },
+    { src: '/images/wax_envelope.jpg', label: 'wax_envelope.jpg' },
+  ];
+
+  const [assets, setAssets] = useState<Array<{ src: string; label: string }>>(DEFAULT_ASSETS);
   const [isUploading, setIsUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
     try {
-      const raw = localStorage.getItem('bibo_custom_assets');
-      if (raw) setCustomAssets(JSON.parse(raw));
+      const raw = localStorage.getItem('bibo_library_assets');
+      if (raw) {
+        setAssets(JSON.parse(raw));
+      } else {
+        const customRaw = localStorage.getItem('bibo_custom_assets');
+        if (customRaw) {
+          const custom = JSON.parse(customRaw);
+          setAssets([...custom, ...DEFAULT_ASSETS]);
+        }
+      }
     } catch { /* ignore */ }
   }, []);
 
-  const addCustomAsset = (asset: { src: string; label: string }) => {
-    setCustomAssets(prev => {
+  const addAsset = (asset: { src: string; label: string }) => {
+    setAssets(prev => {
       const next = [asset, ...prev.filter(a => a.src !== asset.src)];
-      try { localStorage.setItem('bibo_custom_assets', JSON.stringify(next)); } catch { /* ignore */ }
+      try { localStorage.setItem('bibo_library_assets', JSON.stringify(next)); } catch { /* ignore */ }
       return next;
+    });
+  };
+
+  const deleteAsset = (srcToDelete: string) => {
+    if (!confirm('Are you sure you want to delete this photo from your library?')) return;
+    setAssets(prev => {
+      const next = prev.filter(a => a.src !== srcToDelete);
+      try { localStorage.setItem('bibo_library_assets', JSON.stringify(next)); } catch { /* ignore */ }
+      return next;
+    });
+    if (memForm.image_url === srcToDelete) {
+      setMemForm(f => ({ ...f, image_url: '' }));
+    }
+  };
+
+  const restoreDefaultAssets = () => {
+    if (!confirm('Restore all default starter photos to the library?')) return;
+    setAssets(prev => {
+      const combined = [...prev];
+      for (const def of DEFAULT_ASSETS) {
+        if (!combined.some(c => c.src === def.src)) combined.push(def);
+      }
+      try { localStorage.setItem('bibo_library_assets', JSON.stringify(combined)); } catch { /* ignore */ }
+      return combined;
     });
   };
 
@@ -308,7 +347,7 @@ export default function HostPage() {
       }
 
       const newAsset = { src: url, label: file.name };
-      addCustomAsset(newAsset);
+      addAsset(newAsset);
       setMemForm(f => ({ ...f, image_url: url }));
     } catch (err) {
       console.error('File upload failed:', err);
@@ -990,7 +1029,7 @@ export default function HostPage() {
                             </p>
                           </div>
 
-                          <div>
+                          <div className="flex items-center gap-2">
                             <input
                               type="file"
                               ref={fileInputRef}
@@ -998,6 +1037,13 @@ export default function HostPage() {
                               className="hidden"
                               onChange={handleFileUpload}
                             />
+                            <button
+                              onClick={restoreDefaultAssets}
+                              className="px-2.5 py-2 rounded-xl text-[11px] font-medium bg-white/5 border border-white/10 text-white/50 hover:bg-white/10 hover:text-white/80 transition-colors"
+                              title="Restore starter photos"
+                            >
+                              Restore Defaults
+                            </button>
                             <button
                               onClick={() => fileInputRef.current?.click()}
                               disabled={isUploading}
@@ -1012,13 +1058,7 @@ export default function HostPage() {
 
                         {/* Photos Grid */}
                         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 mt-3">
-                          {[
-                            ...customAssets,
-                            { src: '/images/couple_portrait.jpg', label: 'couple_portrait.jpg' },
-                            { src: '/images/couple_garden.jpg', label: 'couple_garden.jpg' },
-                            { src: '/images/couple_winter.jpg', label: 'couple_winter.jpg' },
-                            { src: '/images/wax_envelope.jpg', label: 'wax_envelope.jpg' },
-                          ].map((img) => {
+                          {assets.map((img) => {
                             const isSelected = memForm.image_url === img.src;
                             return (
                               <div
@@ -1047,23 +1087,46 @@ export default function HostPage() {
                                   )}
                                 </div>
                                 <div className="flex items-center justify-between px-1 mt-1">
-                                  <p className="text-[10px] text-white/60 font-mono truncate max-w-[110px]" title={img.label}>{img.label}</p>
-                                  <button
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      navigator.clipboard.writeText(img.src);
-                                      alert(`Copied link to clipboard: ${img.src}`);
-                                    }}
-                                    className="opacity-0 group-hover:opacity-100 transition-opacity p-1 hover:text-rose-400 text-white/40"
-                                    title="Copy Path"
-                                  >
-                                    <Copy size={11} />
-                                  </button>
+                                  <p className="text-[10px] text-white/60 font-mono truncate max-w-[80px]" title={img.label}>{img.label}</p>
+                                  <div className="flex items-center gap-0.5">
+                                    <button
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        navigator.clipboard.writeText(img.src);
+                                        alert(`Copied link to clipboard: ${img.src}`);
+                                      }}
+                                      className="opacity-0 group-hover:opacity-100 transition-opacity p-1 hover:text-rose-400 text-white/40"
+                                      title="Copy Path"
+                                    >
+                                      <Copy size={11} />
+                                    </button>
+                                    <button
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        deleteAsset(img.src);
+                                      }}
+                                      className="opacity-0 group-hover:opacity-100 transition-opacity p-1 text-red-400/60 hover:text-red-400 hover:bg-red-500/15 rounded"
+                                      title="Delete Photo from Library"
+                                    >
+                                      <Trash2 size={11} />
+                                    </button>
+                                  </div>
                                 </div>
                               </div>
                             );
                           })}
                         </div>
+                        {assets.length === 0 && (
+                          <div className="text-center py-8">
+                            <p className="text-xs text-white/40">No photos in the library.</p>
+                            <button
+                              onClick={restoreDefaultAssets}
+                              className="mt-2 text-xs text-rose-400 hover:underline"
+                            >
+                              Restore default starter photos
+                            </button>
+                          </div>
+                        )}
                       </Panel>
                     </div>
                   </>
