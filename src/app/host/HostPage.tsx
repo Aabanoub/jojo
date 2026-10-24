@@ -107,10 +107,12 @@ export default function HostPage() {
     upsertMemory,
     deleteMemory,
     markSignalRead,
+    upsertAsset,
+    deleteAsset,
     resetAllData,
   } = usePortal();
 
-  const { settings, events, envelopes, tracks, memories, signals } = state;
+  const { settings, events, envelopes, tracks, memories, signals, assets } = state;
 
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [password, setPassword] = useState('');
@@ -265,62 +267,28 @@ export default function HostPage() {
   };
 
   // ── ASSET LIBRARY & UPLOAD / DELETE HANDLERS ───────────────────────────────
-  const DEFAULT_ASSETS = [
-    { src: '/images/couple_portrait.jpg', label: 'couple_portrait.jpg' },
-    { src: '/images/couple_garden.jpg', label: 'couple_garden.jpg' },
-    { src: '/images/couple_winter.jpg', label: 'couple_winter.jpg' },
-    { src: '/images/wax_envelope.jpg', label: 'wax_envelope.jpg' },
-  ];
-
-  const [assets, setAssets] = useState<Array<{ src: string; label: string }>>(DEFAULT_ASSETS);
   const [isUploading, setIsUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
-  useEffect(() => {
-    try {
-      const raw = localStorage.getItem('bibo_library_assets');
-      if (raw) {
-        setAssets(JSON.parse(raw));
-      } else {
-        const customRaw = localStorage.getItem('bibo_custom_assets');
-        if (customRaw) {
-          const custom = JSON.parse(customRaw);
-          setAssets([...custom, ...DEFAULT_ASSETS]);
-        }
-      }
-    } catch { /* ignore */ }
-  }, []);
-
-  const addAsset = (asset: { src: string; label: string }) => {
-    setAssets(prev => {
-      const next = [asset, ...prev.filter(a => a.src !== asset.src)];
-      try { localStorage.setItem('bibo_library_assets', JSON.stringify(next)); } catch { /* ignore */ }
-      return next;
-    });
-  };
-
-  const deleteAsset = (srcToDelete: string) => {
-    if (!confirm('Are you sure you want to delete this photo from your library?')) return;
-    setAssets(prev => {
-      const next = prev.filter(a => a.src !== srcToDelete);
-      try { localStorage.setItem('bibo_library_assets', JSON.stringify(next)); } catch { /* ignore */ }
-      return next;
-    });
-    if (memForm.image_url === srcToDelete) {
+  const handleDeleteAsset = async (assetIdOrUrl: string) => {
+    if (!confirm('Are you sure you want to delete this photo from your library and database?')) return;
+    await deleteAsset(assetIdOrUrl);
+    if (memForm.image_url === assetIdOrUrl) {
       setMemForm(f => ({ ...f, image_url: '' }));
     }
   };
 
-  const restoreDefaultAssets = () => {
-    if (!confirm('Restore all default starter photos to the library?')) return;
-    setAssets(prev => {
-      const combined = [...prev];
-      for (const def of DEFAULT_ASSETS) {
-        if (!combined.some(c => c.src === def.src)) combined.push(def);
-      }
-      try { localStorage.setItem('bibo_library_assets', JSON.stringify(combined)); } catch { /* ignore */ }
-      return combined;
-    });
+  const handleRestoreDefaultAssets = async () => {
+    if (!confirm('Restore all default starter photos to the database?')) return;
+    const DEFAULT_STARTERS = [
+      { id: 'ast-1', name: 'couple_portrait.jpg', url: '/images/couple_portrait.jpg', created_at: new Date().toISOString() },
+      { id: 'ast-2', name: 'couple_garden.jpg', url: '/images/couple_garden.jpg', created_at: new Date().toISOString() },
+      { id: 'ast-3', name: 'couple_winter.jpg', url: '/images/couple_winter.jpg', created_at: new Date().toISOString() },
+      { id: 'ast-4', name: 'wax_envelope.jpg', url: '/images/wax_envelope.jpg', created_at: new Date().toISOString() },
+    ];
+    for (const ast of DEFAULT_STARTERS) {
+      await upsertAsset(ast);
+    }
   };
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -334,7 +302,11 @@ export default function HostPage() {
         const ext = file.name.split('.').pop() || 'jpg';
         const cleanName = `${Date.now()}-${Math.random().toString(36).substring(2, 7)}.${ext}`;
         const uploadedUrl = await uploadFile(BUCKETS.MEMORIES, cleanName, file);
-        if (uploadedUrl) url = uploadedUrl;
+        if (uploadedUrl) {
+          url = uploadedUrl;
+        } else {
+          console.warn('Supabase storage upload returned null, using local fallback.');
+        }
       }
 
       if (!url) {
@@ -346,8 +318,13 @@ export default function HostPage() {
         });
       }
 
-      const newAsset = { src: url, label: file.name };
-      addAsset(newAsset);
+      const newAsset = {
+        id: `ast-${Date.now()}`,
+        name: file.name,
+        url,
+        created_at: new Date().toISOString(),
+      };
+      await upsertAsset(newAsset);
       setMemForm(f => ({ ...f, image_url: url }));
     } catch (err) {
       console.error('File upload failed:', err);
@@ -1038,7 +1015,7 @@ export default function HostPage() {
                               onChange={handleFileUpload}
                             />
                             <button
-                              onClick={restoreDefaultAssets}
+                              onClick={handleRestoreDefaultAssets}
                               className="px-2.5 py-2 rounded-xl text-[11px] font-medium bg-white/5 border border-white/10 text-white/50 hover:bg-white/10 hover:text-white/80 transition-colors"
                               title="Restore starter photos"
                             >
@@ -1059,12 +1036,14 @@ export default function HostPage() {
                         {/* Photos Grid */}
                         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 mt-3">
                           {assets.map((img) => {
-                            const isSelected = memForm.image_url === img.src;
+                            const assetUrl = img.url || (img as any).src;
+                            const assetName = img.name || (img as any).label || 'photo.jpg';
+                            const isSelected = memForm.image_url === assetUrl;
                             return (
                               <div
-                                key={img.src}
+                                key={img.id || assetUrl}
                                 onClick={() => {
-                                  setMemForm(f => ({ ...f, image_url: img.src }));
+                                  setMemForm(f => ({ ...f, image_url: assetUrl }));
                                 }}
                                 className={`group relative flex flex-col gap-1 p-2 rounded-2xl cursor-pointer transition-all border ${
                                   isSelected
@@ -1073,7 +1052,7 @@ export default function HostPage() {
                                 }`}
                               >
                                 <div className="rounded-xl overflow-hidden h-28 relative">
-                                  <img src={img.src} alt={img.label} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
+                                  <img src={assetUrl} alt={assetName} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
                                   {isSelected ? (
                                     <div className="absolute top-1.5 right-1.5 bg-rose-500 text-white rounded-full p-1 shadow-md">
                                       <Check size={12} />
@@ -1087,13 +1066,13 @@ export default function HostPage() {
                                   )}
                                 </div>
                                 <div className="flex items-center justify-between px-1 mt-1">
-                                  <p className="text-[10px] text-white/60 font-mono truncate max-w-[80px]" title={img.label}>{img.label}</p>
+                                  <p className="text-[10px] text-white/60 font-mono truncate max-w-[80px]" title={assetName}>{assetName}</p>
                                   <div className="flex items-center gap-0.5">
                                     <button
                                       onClick={(e) => {
                                         e.stopPropagation();
-                                        navigator.clipboard.writeText(img.src);
-                                        alert(`Copied link to clipboard: ${img.src}`);
+                                        navigator.clipboard.writeText(assetUrl);
+                                        alert(`Copied link to clipboard: ${assetUrl}`);
                                       }}
                                       className="opacity-0 group-hover:opacity-100 transition-opacity p-1 hover:text-rose-400 text-white/40"
                                       title="Copy Path"
@@ -1103,10 +1082,10 @@ export default function HostPage() {
                                     <button
                                       onClick={(e) => {
                                         e.stopPropagation();
-                                        deleteAsset(img.src);
+                                        handleDeleteAsset(img.id || assetUrl);
                                       }}
                                       className="opacity-0 group-hover:opacity-100 transition-opacity p-1 text-red-400/60 hover:text-red-400 hover:bg-red-500/15 rounded"
-                                      title="Delete Photo from Library"
+                                      title="Delete Photo from Library and Database"
                                     >
                                       <Trash2 size={11} />
                                     </button>
@@ -1120,7 +1099,7 @@ export default function HostPage() {
                           <div className="text-center py-8">
                             <p className="text-xs text-white/40">No photos in the library.</p>
                             <button
-                              onClick={restoreDefaultAssets}
+                              onClick={handleRestoreDefaultAssets}
                               className="mt-2 text-xs text-rose-400 hover:underline"
                             >
                               Restore default starter photos

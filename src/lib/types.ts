@@ -87,6 +87,13 @@ export interface JojoSignal {
   created_at: string;
 }
 
+export interface UploadedAsset {
+  id: string;
+  name: string;
+  url: string;
+  created_at: string;
+}
+
 export interface PortalState {
   settings: SiteSettings;
   events: EventVault[];
@@ -94,4 +101,5 @@ export interface PortalState {
   tracks: PlaylistTrack[];
   memories: Memory[];
   signals: JojoSignal[];
+  assets: UploadedAsset[];
 }

@@ -108,7 +108,17 @@ create table if not exists public.jojo_signals (
 );
 
 -- -------------------------------------------------------------------------
--- 7. ROW LEVEL SECURITY (RLS) POLICIES
+-- 7. UPLOADED ASSETS / PHOTO LIBRARY TABLE
+-- -------------------------------------------------------------------------
+create table if not exists public.uploaded_assets (
+  id uuid primary key default uuid_generate_v4(),
+  name text not null,
+  url text not null unique,
+  created_at timestamptz not null default now()
+);
+
+-- -------------------------------------------------------------------------
+-- 8. ROW LEVEL SECURITY (RLS) POLICIES
 -- -------------------------------------------------------------------------
 alter table public.site_settings enable row level security;
 alter table public.events_vault enable row level security;
@@ -116,6 +126,7 @@ alter table public.open_when_envelopes enable row level security;
 alter table public.playlist_tracks enable row level security;
 alter table public.memories enable row level security;
 alter table public.jojo_signals enable row level security;
+alter table public.uploaded_assets enable row level security;
 
 -- Drop existing policies if re-running script to avoid duplicate policy errors
 drop policy if exists "Allow public all on site_settings" on public.site_settings;
@@ -124,6 +135,7 @@ drop policy if exists "Allow public all on open_when_envelopes" on public.open_w
 drop policy if exists "Allow public all on playlist_tracks" on public.playlist_tracks;
 drop policy if exists "Allow public all on memories" on public.memories;
 drop policy if exists "Allow public all on jojo_signals" on public.jojo_signals;
+drop policy if exists "Allow public all on uploaded_assets" on public.uploaded_assets;
 
 create policy "Allow public all on site_settings" on public.site_settings for all to public using (true) with check (true);
 create policy "Allow public all on events_vault" on public.events_vault for all to public using (true) with check (true);
@@ -131,9 +143,10 @@ create policy "Allow public all on open_when_envelopes" on public.open_when_enve
 create policy "Allow public all on playlist_tracks" on public.playlist_tracks for all to public using (true) with check (true);
 create policy "Allow public all on memories" on public.memories for all to public using (true) with check (true);
 create policy "Allow public all on jojo_signals" on public.jojo_signals for all to public using (true) with check (true);
+create policy "Allow public all on uploaded_assets" on public.uploaded_assets for all to public using (true) with check (true);
 
 -- -------------------------------------------------------------------------
--- 8. STORAGE BUCKETS (Public buckets for media, music, memories)
+-- 9. STORAGE BUCKETS (Public buckets for media, music, memories)
 -- -------------------------------------------------------------------------
 insert into storage.buckets (id, name, public)
 values 
@@ -161,7 +174,7 @@ create policy "Allow public delete in love app buckets" on storage.objects
   for delete to public using (bucket_id in ('vault-media', 'music', 'memories'));
 
 -- -------------------------------------------------------------------------
--- 9. INITIAL SEED DATA FOR BIBO & JOJO
+-- 10. INITIAL SEED DATA FOR BIBO & JOJO
 -- -------------------------------------------------------------------------
 insert into public.site_settings (id) values (1) on conflict (id) do nothing;
 
@@ -253,8 +266,17 @@ values
 )
 on conflict do nothing;
 
+-- Uploaded Assets Initial Seed
+insert into public.uploaded_assets (name, url)
+values
+  ('couple_portrait.jpg', '/images/couple_portrait.jpg'),
+  ('couple_garden.jpg', '/images/couple_garden.jpg'),
+  ('couple_winter.jpg', '/images/couple_winter.jpg'),
+  ('wax_envelope.jpg', '/images/wax_envelope.jpg')
+on conflict (url) do nothing;
+
 -- -------------------------------------------------------------------------
--- 10. REALTIME PUBLICATION SETUP (Idempotent)
+-- 11. REALTIME PUBLICATION SETUP (Idempotent)
 -- -------------------------------------------------------------------------
 do $$
 begin
@@ -275,5 +297,8 @@ begin
   end if;
   if not exists (select 1 from pg_publication_tables where pubname = 'supabase_realtime' and tablename = 'jojo_signals') then
     alter publication supabase_realtime add table public.jojo_signals;
+  end if;
+  if not exists (select 1 from pg_publication_tables where pubname = 'supabase_realtime' and tablename = 'uploaded_assets') then
+    alter publication supabase_realtime add table public.uploaded_assets;
   end if;
 end $$;

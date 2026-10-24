@@ -1,7 +1,7 @@
 'use client';
 
 import React, { createContext, useContext, useEffect, useState, useCallback, useRef } from 'react';
-import type { PortalState, SiteSettings, EventVault, OpenWhenEnvelope, PlaylistTrack, Memory, JojoSignal } from './types';
+import type { PortalState, SiteSettings, EventVault, OpenWhenEnvelope, PlaylistTrack, Memory, JojoSignal, UploadedAsset } from './types';
 import { DEFAULT_STATE } from './seed';
 import { supabase, isSupabaseConfigured } from './supabase';
 
@@ -22,6 +22,8 @@ interface PortalContextType {
   deleteMemory: (id: string) => Promise<void>;
   sendSignal: (signal: Omit<JojoSignal, 'id' | 'created_at' | 'is_read'>) => Promise<void>;
   markSignalRead: (id: string) => Promise<void>;
+  upsertAsset: (asset: UploadedAsset) => Promise<void>;
+  deleteAsset: (idOrUrl: string) => Promise<void>;
   resetAllData: () => Promise<void>;
 }
 
@@ -47,6 +49,7 @@ function loadLocal(): PortalState {
         tracks: parsed.tracks && parsed.tracks.length > 0 ? parsed.tracks : DEFAULT_STATE.tracks,
         memories: parsed.memories && parsed.memories.length > 0 ? parsed.memories : DEFAULT_STATE.memories,
         signals: parsed.signals || DEFAULT_STATE.signals,
+        assets: parsed.assets && parsed.assets.length > 0 ? parsed.assets : DEFAULT_STATE.assets,
       };
     }
   } catch { /* ignore */ }
@@ -69,7 +72,7 @@ export function PortalProvider({ children }: { children: React.ReactNode }) {
       const client = supabase;
       // Load from Supabase
       (async () => {
-        const [settingsRes, eventsRes, envelopesRes, tracksRes, memoriesRes, signalsRes] =
+        const [settingsRes, eventsRes, envelopesRes, tracksRes, memoriesRes, signalsRes, assetsRes] =
           await Promise.all([
             client.from('site_settings').select('*').eq('id', 1).single(),
             client.from('events_vault').select('*').order('created_at', { ascending: true }),
@@ -77,6 +80,7 @@ export function PortalProvider({ children }: { children: React.ReactNode }) {
             client.from('playlist_tracks').select('*').order('sort_order', { ascending: true }),
             client.from('memories').select('*').order('sort_order', { ascending: true }),
             client.from('jojo_signals').select('*').order('created_at', { ascending: false }),
+            client.from('uploaded_assets').select('*').order('created_at', { ascending: false }),
           ]);
 
         setState({
@@ -86,6 +90,7 @@ export function PortalProvider({ children }: { children: React.ReactNode }) {
           tracks: tracksRes.data || DEFAULT_STATE.tracks,
           memories: memoriesRes.data || DEFAULT_STATE.memories,
           signals: signalsRes.data || DEFAULT_STATE.signals,
+          assets: assetsRes.data && assetsRes.data.length > 0 ? assetsRes.data : DEFAULT_STATE.assets,
         });
       })();
 
@@ -118,6 +123,11 @@ export function PortalProvider({ children }: { children: React.ReactNode }) {
         .on('postgres_changes', { event: '*', schema: 'public', table: 'jojo_signals' }, () => {
           client.from('jojo_signals').select('*').order('created_at', { ascending: false }).then(({ data }) => {
             if (data) setState(s => ({ ...s, signals: data }));
+          });
+        })
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'uploaded_assets' }, () => {
+          client.from('uploaded_assets').select('*').order('created_at', { ascending: false }).then(({ data }) => {
+            if (data && data.length > 0) setState(s => ({ ...s, assets: data }));
           });
         })
         .subscribe();
@@ -300,6 +310,32 @@ export function PortalProvider({ children }: { children: React.ReactNode }) {
     }
   }, [isSupabaseMode, broadcast]);
 
+  const upsertAsset = useCallback(async (asset: UploadedAsset) => {
+    if (isSupabaseMode && supabase) {
+      await supabase.from('uploaded_assets').upsert(asset);
+    } else {
+      setState(prev => {
+        const idx = prev.assets.findIndex(a => a.id === asset.id || a.url === asset.url);
+        const assets = [...prev.assets];
+        if (idx >= 0) assets[idx] = asset; else assets.unshift(asset);
+        const next = { ...prev, assets };
+        broadcast(next);
+        return next;
+      });
+    }
+  }, [isSupabaseMode, broadcast]);
+
+  const deleteAsset = useCallback(async (idOrUrl: string) => {
+    if (isSupabaseMode && supabase) {
+      await supabase.from('uploaded_assets').delete().or(`id.eq.${idOrUrl},url.eq.${idOrUrl}`);
+    }
+    setState(prev => {
+      const next = { ...prev, assets: prev.assets.filter(a => a.id !== idOrUrl && a.url !== idOrUrl) };
+      broadcast(next);
+      return next;
+    });
+  }, [isSupabaseMode, broadcast]);
+
   const resetAllData = useCallback(async () => {
     if (typeof window !== 'undefined') {
       try {
@@ -317,6 +353,10 @@ export function PortalProvider({ children }: { children: React.ReactNode }) {
         await supabase.from('playlist_tracks').delete().neq('id', '00000000-0000-0000-0000-000000000000');
         await supabase.from('memories').delete().neq('id', '00000000-0000-0000-0000-000000000000');
         await supabase.from('jojo_signals').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+        await supabase.from('uploaded_assets').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+        for (const a of DEFAULT_STATE.assets) {
+          await supabase.from('uploaded_assets').upsert(a);
+        }
       } catch (err) {
         console.error('Failed to reset Supabase data:', err);
       }
@@ -338,6 +378,8 @@ export function PortalProvider({ children }: { children: React.ReactNode }) {
       deleteMemory,
       sendSignal,
       markSignalRead,
+      upsertAsset,
+      deleteAsset,
       resetAllData,
     }}>
       {children}

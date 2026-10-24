@@ -1,4 +1,4 @@
-import type { SiteSettings, EventVault, OpenWhenEnvelope, PlaylistTrack, Memory, PortalState } from './types';
+import type { SiteSettings, EventVault, OpenWhenEnvelope, PlaylistTrack, Memory, PortalState, UploadedAsset } from './types';
 
 export const DEFAULT_SETTINGS: SiteSettings = {
   id: 1,
@@ -131,6 +131,13 @@ export const DEFAULT_MEMORIES: Memory[] = [
   },
 ];
 
+export const DEFAULT_ASSETS: UploadedAsset[] = [
+  { id: 'ast-1', name: 'couple_portrait.jpg', url: '/images/couple_portrait.jpg', created_at: '2025-09-15T12:00:00.000Z' },
+  { id: 'ast-2', name: 'couple_garden.jpg', url: '/images/couple_garden.jpg', created_at: '2025-09-15T12:00:00.000Z' },
+  { id: 'ast-3', name: 'couple_winter.jpg', url: '/images/couple_winter.jpg', created_at: '2025-09-15T12:00:00.000Z' },
+  { id: 'ast-4', name: 'wax_envelope.jpg', url: '/images/wax_envelope.jpg', created_at: '2025-09-15T12:00:00.000Z' },
+];
+
 export const DEFAULT_STATE: PortalState = {
   settings: DEFAULT_SETTINGS,
   events: DEFAULT_EVENTS,
@@ -146,4 +153,5 @@ export const DEFAULT_STATE: PortalState = {
       created_at: '2025-09-15T12:00:00.000Z',
     },
   ],
+  assets: DEFAULT_ASSETS,
 };
