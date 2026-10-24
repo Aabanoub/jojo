@@ -402,6 +402,16 @@ export default function JojoPage() {
             </motion.div>
           )}
         </AnimatePresence>
+
+        {/* Discreet Host Studio Link at bottom */}
+        <div className="pt-8 pb-4 text-center">
+          <a
+            href="/host"
+            className="inline-flex items-center gap-1.5 text-[11px] text-[#44292E]/40 hover:text-[#44292E]/80 transition-colors px-3 py-1.5 rounded-full hover:bg-white/40"
+          >
+            <span>🔒</span> Bibo&apos;s Host Studio
+          </a>
+        </div>
       </main>
 
       {/* ─────────────────────────────────────────────────────────────
