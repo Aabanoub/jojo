@@ -18,6 +18,7 @@ export default function JojoPage() {
   const { state, sendSignal } = usePortal();
   const { settings, events, envelopes, tracks, memories } = state;
   const [activeTab, setActiveTab] = useState<TabId>('home');
+  const [envelopeViewMode, setEnvelopeViewMode] = useState<'grid' | 'expanded'>('grid');
   const [showTogetherDetail, setShowTogetherDetail] = useState(false);
   const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
   const [pingMessage, setPingMessage] = useState('');
@@ -330,49 +331,6 @@ export default function JojoPage() {
                 <VaultCard event={selectedEvent} accentColor={settings.accent_color} />
               </section>
             )}
-
-            {/* Card 4: Open When Envelopes in Grid */}
-            <section className="space-y-2 pt-1">
-              <div className="flex items-center justify-between px-1">
-                <h3
-                  className="text-xs font-bold"
-                  style={{ fontFamily: `'${settings.heading_font || 'Playfair Display'}', serif` }}
-                >
-                  Open When...
-                </h3>
-                {envelopes.length > 2 && (
-                  <button
-                    onClick={() => setActiveTab('envelopes')}
-                    className="text-[10px] text-[#C47D88] hover:underline font-medium cursor-pointer"
-                  >
-                    View All ({envelopes.length}) →
-                  </button>
-                )}
-              </div>
-              {envelopes.length > 0 ? (
-                <div className="grid grid-cols-2 gap-3">
-                  {envelopes.slice(0, 4).map((env) => (
-                    <EnvelopeCard
-                      key={env.id}
-                      envelope={env}
-                      accentColor={settings.accent_color}
-                      masterPassword={settings.master_password}
-                      compact={true}
-                    />
-                  ))}
-                </div>
-              ) : (
-                <div
-                  className="rounded-2xl p-5 text-center shadow-xs"
-                  style={{
-                    background: 'rgba(255, 255, 255, 0.45)',
-                    border: '1px dashed rgba(255, 255, 255, 0.7)',
-                  }}
-                >
-                  <p className="text-xs text-[#7A5B61]">No envelopes created yet. Add one in the Host Studio!</p>
-                </div>
-              )}
-            </section>
           </motion.div>
         )}
 
@@ -477,35 +435,92 @@ export default function JojoPage() {
             exit={{ opacity: 0 }}
             className="space-y-4"
           >
-            <header className="pt-1">
-              <h1
-                className="text-2xl font-bold tracking-tight"
-                style={{
-                  fontFamily: `'${settings.heading_font || 'Playfair Display'}', serif`,
-                  color: settings.text_primary || '#44292E',
-                }}
-              >
-                Open When Envelopes
-              </h1>
-              <p className="text-sm text-[#C47D88] font-script mt-0.5 font-bold">
-                For {settings.her_nickname || 'Jojo'} 💕
-              </p>
+            <header className="pt-1 flex items-center justify-between">
+              <div>
+                <h1
+                  className="text-2xl font-bold tracking-tight"
+                  style={{
+                    fontFamily: `'${settings.heading_font || 'Playfair Display'}', serif`,
+                    color: settings.text_primary || '#44292E',
+                  }}
+                >
+                  Open When Envelopes
+                </h1>
+                <p className="text-sm text-[#C47D88] font-script mt-0.5 font-bold">
+                  For {settings.her_nickname || 'Jojo'} 💕
+                </p>
+              </div>
+
+              {envelopes.length > 0 && (
+                <div className="flex items-center gap-1 bg-white/60 p-1 rounded-full border border-white/80 shadow-xs">
+                  <button
+                    onClick={() => setEnvelopeViewMode('grid')}
+                    className={`px-2.5 py-1 rounded-full text-[10px] font-semibold transition-all cursor-pointer ${
+                      envelopeViewMode === 'grid'
+                        ? 'bg-white text-[#44292E] shadow-xs'
+                        : 'text-[#7A5B61] hover:text-[#44292E]'
+                    }`}
+                  >
+                    Grid ⊞
+                  </button>
+                  <button
+                    onClick={() => setEnvelopeViewMode('expanded')}
+                    className={`px-2.5 py-1 rounded-full text-[10px] font-semibold transition-all cursor-pointer ${
+                      envelopeViewMode === 'expanded'
+                        ? 'bg-white text-[#44292E] shadow-xs'
+                        : 'text-[#7A5B61] hover:text-[#44292E]'
+                    }`}
+                  >
+                    Full 📜
+                  </button>
+                </div>
+              )}
             </header>
 
-            {/* Envelopes list */}
+            {/* Envelopes list / grid */}
             <section className="space-y-3">
-              {envelopes.map((env) => (
-                <EnvelopeCard
-                  key={env.id}
-                  envelope={env}
-                  accentColor={settings.accent_color}
-                  masterPassword={settings.master_password}
-                  compact={false}
-                />
-              ))}
-              {envelopes.length === 0 && (
-                <div className="text-center py-8 text-xs text-[#7A5B61]">
-                  No envelopes yet from {settings.his_nickname || 'Bibo'}.
+              {envelopes.length > 0 ? (
+                envelopeViewMode === 'grid' ? (
+                  <div className="grid grid-cols-2 gap-3">
+                    {envelopes.map((env) => (
+                      <EnvelopeCard
+                        key={env.id}
+                        envelope={env}
+                        accentColor={settings.accent_color}
+                        masterPassword={settings.master_password}
+                        compact={true}
+                      />
+                    ))}
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {envelopes.map((env) => (
+                      <EnvelopeCard
+                        key={env.id}
+                        envelope={env}
+                        accentColor={settings.accent_color}
+                        masterPassword={settings.master_password}
+                        compact={false}
+                      />
+                    ))}
+                  </div>
+                )
+              ) : (
+                <div
+                  className="rounded-3xl p-8 text-center shadow-sm"
+                  style={{
+                    background: 'rgba(255, 255, 255, 0.45)',
+                    backdropFilter: 'blur(16px)',
+                    border: '1px dashed rgba(240, 205, 175, 0.8)',
+                  }}
+                >
+                  <div className="w-12 h-12 rounded-full mx-auto mb-3 flex items-center justify-center bg-white/70 text-2xl shadow-xs">
+                    💌
+                  </div>
+                  <h3 className="text-sm font-semibold text-[#44292E]">No Envelopes Yet</h3>
+                  <p className="text-xs text-[#7A5B61] mt-1 max-w-xs mx-auto">
+                    When envelopes are created in Host Studio, they will appear here as &ldquo;Open When...&rdquo; letters for {settings.her_nickname || 'Jojo'} 💕
+                  </p>
                 </div>
               )}
             </section>
