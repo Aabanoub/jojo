@@ -110,6 +110,8 @@ export default function HostPage() {
     upsertMemory,
     deleteMemory,
     sendSignal,
+    deleteSignal,
+    deleteSignals,
     markSignalRead,
     upsertAsset,
     deleteAsset,
@@ -845,9 +847,13 @@ export default function HostPage() {
             )}
 
             <button
-              onClick={() => { signals.forEach(s => !s.is_read && markSignalRead(s.id)); }}
+              onClick={() => {
+                if (signals.length > 0) {
+                  deleteSignals(signals.map(s => s.id));
+                }
+              }}
               className="w-8 h-8 rounded-full bg-white/5 border border-white/10 flex items-center justify-center text-white/70 hover:bg-white/10 relative cursor-pointer"
-              title="Alerts active. Click to mark all read."
+              title="Alerts active. Click to delete viewed signals from database."
             >
               <Bell size={14} className={hostNotifPermission === 'granted' ? 'text-emerald-400' : ''} />
               {unreadCount > 0 && (
@@ -1399,12 +1405,16 @@ ALTER TABLE public.site_settings ADD COLUMN IF NOT EXISTS lock_message text DEFA
                             );
                           })}
                         </div>
-                        {signals.some(s => !s.is_read) && (
+                        {signals.length > 0 && (
                           <button
-                            onClick={() => signals.forEach(s => !s.is_read && markSignalRead(s.id))}
+                            onClick={() => {
+                              if (confirm('Delete all signals from the database?')) {
+                                deleteSignals(signals.map(s => s.id));
+                              }
+                            }}
                             className="text-[10px] text-rose-300/80 hover:text-rose-200 underline cursor-pointer"
                           >
-                            Mark all read
+                            Delete viewed signals from DB 🗑️
                           </button>
                         )}
                       </div>
@@ -1463,14 +1473,14 @@ ALTER TABLE public.site_settings ADD COLUMN IF NOT EXISTS lock_message text DEFA
                                       </p>
                                     </div>
                                   </div>
-                                  {!sig.is_read && !isFromBibo && (
-                                    <button
-                                      onClick={() => markSignalRead(sig.id)}
-                                      className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 shrink-0 hover:bg-emerald-500/30 cursor-pointer"
-                                    >
-                                      Mark Read
-                                    </button>
-                                  )}
+                                  <button
+                                    onClick={() => deleteSignal(sig.id)}
+                                    className="text-[10px] px-2 py-1 rounded-lg bg-rose-500/15 hover:bg-rose-500/25 text-rose-300 border border-rose-500/30 shrink-0 cursor-pointer flex items-center gap-1 transition-colors"
+                                    title="Delete from database after viewing"
+                                  >
+                                    <Trash2 size={11} />
+                                    <span>Delete</span>
+                                  </button>
                                 </div>
                               );
                             })}

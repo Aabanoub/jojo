@@ -23,7 +23,7 @@ import ClientDate from '@/components/ClientDate';
 type TabId = 'home' | 'vault' | 'envelopes' | 'memories' | 'ping';
 
 export default function JojoPage() {
-  const { state, sendSignal, upsertMemory, upsertAsset } = usePortal();
+  const { state, sendSignal, upsertMemory, upsertAsset, deleteSignal, deleteSignals } = usePortal();
   const { settings, events, envelopes, tracks, memories, signals } = state;
 
   // ── Safety Mode State (Hides his name/nickname & her name/nickname across the web)
@@ -178,7 +178,11 @@ export default function JojoPage() {
             navigator.vibrate([200, 100, 200]);
           }
         } catch {}
-        const timer = setTimeout(() => setLatestIncomingSignal(null), 8000);
+        const timer = setTimeout(() => {
+          // Ephemeral signal: auto-delete from database after 10 seconds viewing
+          deleteSignal(newest.id);
+          setLatestIncomingSignal(null);
+        }, 10000);
         return () => clearTimeout(timer);
       }
     }
@@ -755,31 +759,49 @@ export default function JojoPage() {
             initial={{ opacity: 0, y: -30, scale: 0.92 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: -20, scale: 0.92 }}
-            onClick={() => {
-              setActiveTab('ping');
-              setLatestIncomingSignal(null);
-            }}
-            className="fixed top-14 left-3 right-3 sm:left-auto sm:right-4 sm:max-w-xs z-50 p-3 rounded-2xl shadow-2xl border backdrop-blur-xl flex items-center gap-2.5 cursor-pointer"
+            className="fixed top-14 left-3 right-3 sm:left-auto sm:right-4 sm:max-w-xs z-50 p-3 rounded-2xl shadow-2xl border backdrop-blur-xl flex items-center justify-between gap-2.5 cursor-pointer"
             style={{
               background: 'linear-gradient(135deg, rgba(255, 245, 247, 0.97), rgba(254, 235, 240, 0.97))',
               borderColor: '#FDA4AF',
               boxShadow: '0 12px 36px rgba(225, 29, 72, 0.28)',
             }}
           >
-            <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-rose-500 to-pink-500 flex items-center justify-center text-white shrink-0 text-base shadow-xs animate-bounce">
-              🔔
-            </div>
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-bold text-rose-800">
-                  New Notification
-                </span>
-                <span className="text-[9px] text-rose-500 underline font-medium">Tap to open</span>
+            <div
+              onClick={() => {
+                setActiveTab('ping');
+                setLatestIncomingSignal(null);
+              }}
+              className="flex items-center gap-2.5 min-w-0 flex-1"
+            >
+              <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-rose-500 to-pink-500 flex items-center justify-center text-white shrink-0 text-base shadow-xs animate-bounce">
+                🔔
               </div>
-              <p className="text-[11px] text-[#7A5B61] mt-0.5">
-                New notification
-              </p>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-rose-800">
+                    New Notification
+                  </span>
+                  <span className="text-[9px] text-rose-500 underline font-medium">Tap to open</span>
+                </div>
+                <p className="text-[11px] text-[#7A5B61] mt-0.5">
+                  New notification
+                </p>
+              </div>
             </div>
+
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                // Dismiss & immediately delete from database
+                deleteSignal(latestIncomingSignal.id);
+                setLatestIncomingSignal(null);
+              }}
+              className="w-6 h-6 rounded-full bg-rose-200/60 hover:bg-rose-200 text-rose-700 flex items-center justify-center text-xs shrink-0 cursor-pointer transition-colors"
+              title="Delete from database after viewing"
+            >
+              ✕
+            </button>
           </motion.div>
         )}
       </AnimatePresence>
@@ -1574,8 +1596,14 @@ export default function JojoPage() {
                     Ping {isSafetyMode ? 'Special Someone' : displayHisNick} ❤️
                   </h3>
                   <button
-                    onClick={() => setActiveTab('home')}
-                    className="w-6 h-6 rounded-full bg-white/70 flex items-center justify-center text-xs text-gray-500 cursor-pointer"
+                    onClick={() => {
+                      if (biboSignals.length > 0) {
+                        deleteSignals(biboSignals.map(s => s.id));
+                      }
+                      setActiveTab('home');
+                    }}
+                    className="w-6 h-6 rounded-full bg-white/70 flex items-center justify-center text-xs text-gray-500 hover:text-gray-800 cursor-pointer"
+                    title="Close and delete viewed signals from database"
                   >
                     ✕
                   </button>
@@ -1632,13 +1660,28 @@ export default function JojoPage() {
 
                 {/* Signals Received from Bibo */}
                 <div className="mt-4 pt-3 border-t border-pink-200/60">
-                  <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center justify-between mb-1">
                     <span className="text-[11px] font-semibold text-[#5D3A42] flex items-center gap-1">
                       <span>💌</span>
                       <span>{isSafetyMode ? 'Signals From Our Space' : `Signals from ${displayHisNick}`}</span>
                     </span>
-                    <span className="text-[9px] text-[#A07A82] font-medium">{biboSignals.length} received</span>
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-[9px] text-[#A07A82] font-medium">{biboSignals.length} received</span>
+                      {biboSignals.length > 0 && (
+                        <button
+                          type="button"
+                          onClick={() => deleteSignals(biboSignals.map(s => s.id))}
+                          className="text-[9px] px-2 py-0.5 rounded-full bg-rose-100/80 hover:bg-rose-200 text-rose-600 font-semibold cursor-pointer transition-colors"
+                          title="Delete all viewed signals from database"
+                        >
+                          Clear Viewed 🗑️
+                        </button>
+                      )}
+                    </div>
                   </div>
+                  <p className="text-[9px] text-[#A07A82]/80 mb-2 italic">
+                    🔒 Messages delete from the database after viewing for privacy.
+                  </p>
 
                   {biboSignals.length === 0 ? (
                     <p className="text-[10px] text-[#A07A82] text-center py-2 bg-white/40 rounded-xl">
@@ -1649,7 +1692,7 @@ export default function JojoPage() {
                       {biboSignals.slice(0, 10).map((sig) => (
                         <div
                           key={sig.id}
-                          className="p-2 rounded-xl bg-white/80 border border-pink-100 flex items-start justify-between gap-2 shadow-2xs"
+                          className="p-2.5 rounded-xl bg-white/80 border border-pink-100 flex items-start justify-between gap-2 shadow-2xs"
                         >
                           <div className="flex items-start gap-1.5 min-w-0">
                             <span className="text-xs mt-0.5">❤️</span>
@@ -1660,6 +1703,15 @@ export default function JojoPage() {
                               <ClientDate date={sig.created_at} className="text-[9px] text-[#A07A82] mt-0.5 block" />
                             </div>
                           </div>
+                          <button
+                            type="button"
+                            onClick={() => deleteSignal(sig.id)}
+                            className="text-[10px] px-2 py-0.5 rounded-md bg-rose-50 hover:bg-rose-100 text-rose-600 font-medium shrink-0 cursor-pointer transition-colors flex items-center gap-0.5"
+                            title="Delete from database after viewing"
+                          >
+                            <span>Viewed</span>
+                            <X size={10} />
+                          </button>
                         </div>
                       ))}
                     </div>

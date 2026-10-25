@@ -32,6 +32,8 @@ interface PortalContextType {
   upsertMemory: (memory: Memory) => Promise<{ success: boolean; error?: string }>;
   deleteMemory: (id: string) => Promise<void>;
   sendSignal: (signal: Omit<JojoSignal, 'id' | 'created_at' | 'is_read'>) => Promise<{ success: boolean; error?: string }>;
+  deleteSignal: (id: string) => Promise<void>;
+  deleteSignals: (ids: string[]) => Promise<void>;
   markSignalRead: (id: string) => Promise<void>;
   upsertAsset: (asset: UploadedAsset) => Promise<void>;
   deleteAsset: (idOrUrl: string) => Promise<void>;
@@ -675,22 +677,48 @@ export function PortalProvider({ children }: { children: React.ReactNode }) {
     return { success: false, error: 'Database is not connected on this device' };
   }, [client, broadcast]);
 
-  const markSignalRead = useCallback(async (id: string) => {
+  const deleteSignal = useCallback(async (id: string) => {
     setState(prev => {
-      const next = { ...prev, signals: prev.signals.map(s => s.id === id ? { ...s, is_read: true } : s) };
+      const next = { ...prev, signals: prev.signals.filter(s => s.id !== id) };
       broadcast(next);
       return next;
     });
 
-    if (client) {
+    const activeClient = client || getSupabase();
+    if (activeClient) {
       try {
-        const { error } = await client.from('jojo_signals').update({ is_read: true }).eq('id', id);
-        if (error) console.error('Supabase markSignalRead error:', error.message);
+        const { error } = await activeClient.from('jojo_signals').delete().eq('id', id);
+        if (error) console.error('Supabase deleteSignal error:', error.message);
       } catch (err: any) {
-        console.error('Supabase markSignalRead error:', err);
+        console.error('Supabase deleteSignal error:', err);
       }
     }
   }, [client, broadcast]);
+
+  const deleteSignals = useCallback(async (ids: string[]) => {
+    if (!ids || ids.length === 0) return;
+    const idSet = new Set(ids);
+    setState(prev => {
+      const next = { ...prev, signals: prev.signals.filter(s => !idSet.has(s.id)) };
+      broadcast(next);
+      return next;
+    });
+
+    const activeClient = client || getSupabase();
+    if (activeClient) {
+      try {
+        const { error } = await activeClient.from('jojo_signals').delete().in('id', ids);
+        if (error) console.error('Supabase deleteSignals error:', error.message);
+      } catch (err: any) {
+        console.error('Supabase deleteSignals error:', err);
+      }
+    }
+  }, [client, broadcast]);
+
+  const markSignalRead = useCallback(async (id: string) => {
+    // When a signal is viewed/read, delete it immediately from the database
+    await deleteSignal(id);
+  }, [deleteSignal]);
 
   const upsertAsset = useCallback(async (asset: UploadedAsset) => {
     setState(prev => {
@@ -781,6 +809,8 @@ export function PortalProvider({ children }: { children: React.ReactNode }) {
       upsertMemory,
       deleteMemory,
       sendSignal,
+      deleteSignal,
+      deleteSignals,
       markSignalRead,
       upsertAsset,
       deleteAsset,
