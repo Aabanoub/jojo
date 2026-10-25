@@ -1033,7 +1033,7 @@ ALTER TABLE public.site_settings ADD COLUMN IF NOT EXISTS lock_message text DEFA
                                 <span className="text-[10px] font-normal text-rose-300/80">(إشعار فوري لموبايل جوجو)</span>
                               </h3>
                               <p className="text-[10px] text-white/40">
-                                Rings a sweet chime 🔔, vibrates her phone 📳, and shows on her lock screen!
+                                Rings a sweet chime 🔔, vibrates her phone 📳, and shows discreetly as &quot;New Notification&quot; on her lock screen!
                               </p>
                             </div>
                           </div>
@@ -1230,7 +1230,7 @@ ALTER TABLE public.site_settings ADD COLUMN IF NOT EXISTS lock_message text DEFA
                           <span className="text-xs font-semibold text-white flex items-center gap-1.5">
                             <Heart size={13} className="text-rose-400 fill-rose-400" />
                             <span>Ping Jojo</span>
-                            <span className="text-[10px] font-normal text-rose-300/80">(Send Live Signal to Her Phone 📱)</span>
+                            <span className="text-[10px] font-normal text-rose-300/80">(Sends discreet &quot;New Notification&quot; to Her Phone 📱)</span>
                           </span>
                           {alertSentSuccess && (
                             <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 text-[10px] font-medium flex items-center gap-1 animate-fade-in">

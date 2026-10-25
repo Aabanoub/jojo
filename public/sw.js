@@ -11,36 +11,18 @@ self.addEventListener('activate', (event) => {
 
 // Handle incoming Push events (when website is closed or backgrounded)
 self.addEventListener('push', (event) => {
-  let data = {
-    title: 'Our Space 💕',
-    body: 'New love message from Bibo!',
-    icon: '/icon.svg',
-    url: '/',
-  };
-
-  try {
-    if (event.data) {
-      const parsed = event.data.json();
-      data = { ...data, ...parsed };
-    }
-  } catch (err) {
-    if (event.data) {
-      data.body = event.data.text();
-    }
-  }
-
   const options = {
-    body: data.body,
-    icon: data.icon || '/icon.svg',
+    body: 'New notification',
+    icon: '/icon.svg',
     badge: '/icon.svg',
     vibrate: [250, 100, 250, 100, 250],
-    data: { url: data.url || '/' },
-    tag: data.tag || 'love-alert',
+    data: { url: '/' },
+    tag: 'app-alert',
     renotify: true,
   };
 
   event.waitUntil(
-    self.registration.showNotification(data.title, options)
+    self.registration.showNotification('New Notification', options)
   );
 });
 

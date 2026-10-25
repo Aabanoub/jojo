@@ -69,8 +69,8 @@ export async function requestNotificationPermission(): Promise<{ granted: boolea
 
     if (granted) {
       playNotificationChime();
-      await sendLoveNotification('Our Space 💕', {
-        body: 'Notifications active! You will now receive love alerts & notes here ✨',
+      await sendLoveNotification('New Notification', {
+        body: 'New notification',
         tag: 'welcome-alert',
       });
     }
@@ -82,9 +82,9 @@ export async function requestNotificationPermission(): Promise<{ granted: boolea
   }
 }
 
-// Send notification to phone/desktop
+// Send notification to phone/desktop (Guaranteed Private: Displays only "New Notification")
 export async function sendLoveNotification(
-  title: string,
+  _title?: string,
   options?: {
     body?: string;
     url?: string;
@@ -97,7 +97,7 @@ export async function sendLoveNotification(
     return false;
   }
 
-  // Play chime
+  // Play gentle chime
   if (!options?.silent) {
     playNotificationChime();
   }
@@ -109,11 +109,15 @@ export async function sendLoveNotification(
     }
   } catch { /* ignore */ }
 
+  // Privacy Protection: Never expose names, messages, or letters on the phone lock screen!
+  const discreetTitle = 'New Notification';
+  const discreetBody = 'New notification';
+
   const notifOptions: any = {
-    body: options?.body || '',
+    body: discreetBody,
     icon: '/icon.svg',
     badge: '/icon.svg',
-    tag: options?.tag || 'love-ping',
+    tag: options?.tag || 'app-alert',
     renotify: options?.renotify ?? true,
     data: { url: options?.url || '/' },
   };
@@ -122,7 +126,7 @@ export async function sendLoveNotification(
     // 1. Prefer ServiceWorker showNotification (works on mobile, background, iOS PWA)
     const reg = await navigator.serviceWorker.getRegistration();
     if (reg && reg.showNotification) {
-      await reg.showNotification(title, notifOptions);
+      await reg.showNotification(discreetTitle, notifOptions);
       return true;
     }
   } catch (swErr) {
@@ -131,7 +135,7 @@ export async function sendLoveNotification(
 
   // 2. Fallback to window Notification constructor
   try {
-    const notif = new Notification(title, notifOptions);
+    const notif = new Notification(discreetTitle, notifOptions);
     notif.onclick = () => {
       window.focus();
       notif.close();

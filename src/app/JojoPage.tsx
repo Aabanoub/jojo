@@ -96,8 +96,8 @@ export default function JojoPage() {
   };
 
   const handleTestNotification = async () => {
-    await sendLoveNotification('Our Space 🔔💕', {
-      body: 'Notifications are active! You will now receive love alerts & notes here ✨',
+    await sendLoveNotification('New Notification', {
+      body: 'New notification',
       tag: 'test-' + Date.now(),
     });
     setShowNotifToast(true);
