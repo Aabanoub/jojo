@@ -7,7 +7,7 @@ import {
   Plus, Upload, RotateCw, Check, X,
 } from 'lucide-react';
 import { usePortal } from '@/lib/PortalProvider';
-import { uploadFileDetailed, BUCKETS, isSupabaseConfigured, compressImage } from '@/lib/supabase';
+import { uploadFileDetailed, BUCKETS, isSupabaseConfigured, compressImage, getSupabase, resolveSupabaseCloud } from '@/lib/supabase';
 import { generateUUID, type Memory } from '@/lib/types';
 import ParticleBackground from '@/components/ParticleBackground';
 import MusicPlayer from '@/components/MusicPlayer';
@@ -22,6 +22,13 @@ type TabId = 'home' | 'vault' | 'envelopes' | 'memories' | 'ping';
 export default function JojoPage() {
   const { state, sendSignal, upsertMemory, upsertAsset } = usePortal();
   const { settings, events, envelopes, tracks, memories } = state;
+
+  // ── Pre-flight Database Gatekeeper Algorithm ────────────────────────────────
+  // Prevents rendering any page components until the database lock status is verified!
+  const [gatekeeperStatus, setGatekeeperStatus] = useState<'checking' | 'locked' | 'unlocked'>('checking');
+  const [liveLockMsg, setLiveLockMsg] = useState(settings.lock_message || 'بعمل update علي السريع يا كتكوتي ');
+  const [bypassUnlocked] = useState(false);
+
   const [activeTab, setActiveTab] = useState<TabId>('home');
   const [showTogetherDetail, setShowTogetherDetail] = useState(false);
   const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
@@ -70,6 +77,83 @@ export default function JojoPage() {
     const iv = setInterval(update, 1000);
     return () => clearInterval(iv);
   }, [settings.relationship_start]);
+
+  // ── Pre-flight Database Gatekeeper Check & Continuous Polling ───────────────
+  // Queries Supabase database BEFORE opening or rendering any page content.
+  useEffect(() => {
+    let isMounted = true;
+    let pollInterval: NodeJS.Timeout | null = null;
+
+    async function checkDbLock() {
+      try {
+        let sb = getSupabase();
+        if (!sb) {
+          sb = await resolveSupabaseCloud();
+        }
+
+        if (sb) {
+          const { data, error } = await sb
+            .from('site_settings')
+            .select('is_locked, lock_message')
+            .eq('id', 1)
+            .single();
+
+          if (!error && data && isMounted) {
+            if (data.lock_message) setLiveLockMsg(data.lock_message);
+            if (data.is_locked === true) {
+              setGatekeeperStatus('locked');
+            } else {
+              setGatekeeperStatus('unlocked');
+            }
+            return;
+          }
+        }
+
+        // Fallback: check PortalProvider settings
+        if (isMounted) {
+          if (settings.is_locked) {
+            setGatekeeperStatus('locked');
+            if (settings.lock_message) setLiveLockMsg(settings.lock_message);
+          } else {
+            setGatekeeperStatus('unlocked');
+          }
+        }
+      } catch {
+        if (isMounted) {
+          setGatekeeperStatus(settings.is_locked ? 'locked' : 'unlocked');
+        }
+      }
+    }
+
+    // Run immediate blocking pre-flight check
+    checkDbLock();
+
+    // Active polling every 1.5s: when Bibo unlocks/locks on his PC, her phone updates automatically!
+    pollInterval = setInterval(async () => {
+      const sb = getSupabase();
+      if (!sb) return;
+      try {
+        const { data } = await sb
+          .from('site_settings')
+          .select('is_locked, lock_message')
+          .eq('id', 1)
+          .single();
+        if (data && isMounted) {
+          if (data.lock_message) setLiveLockMsg(data.lock_message);
+          if (data.is_locked === true) {
+            setGatekeeperStatus('locked');
+          } else {
+            setGatekeeperStatus('unlocked');
+          }
+        }
+      } catch { /* ignore network glitches */ }
+    }, 1500);
+
+    return () => {
+      isMounted = false;
+      if (pollInterval) clearInterval(pollInterval);
+    };
+  }, [settings.is_locked, settings.lock_message]);
 
   const quickSignals = [
     `Missing ${settings.his_nickname || 'Bibo'} ❤️`,
@@ -180,6 +264,128 @@ export default function JojoPage() {
       setIsSavingMem(false);
     }
   };
+
+  // ── 1. BLOCKING PRE-FLIGHT CHECK (Nothing renders until verified from DB) ────
+  if (gatekeeperStatus === 'checking') {
+    return (
+      <div
+        className="min-h-screen flex flex-col items-center justify-center p-6 text-center select-none"
+        style={{
+          background: `linear-gradient(175deg, ${settings.bg_primary || '#F8DCDA'} 0%, ${settings.bg_secondary || '#EFC0BD'} 100%)`,
+          color: settings.text_primary || '#44292E',
+          fontFamily: `'Cairo', 'Playfair Display', sans-serif`,
+        }}
+      >
+        <motion.div
+          animate={{ scale: [1, 1.15, 1], rotate: [0, 4, -4, 0] }}
+          transition={{ repeat: Infinity, duration: 2, ease: 'easeInOut' }}
+          className="w-16 h-16 rounded-3xl flex items-center justify-center shadow-lg mb-4 text-3xl"
+          style={{ background: 'linear-gradient(135deg, #FF9A9E 0%, #FECFEF 100%)' }}
+        >
+          💖
+        </motion.div>
+        <h1 className="text-xl font-bold tracking-tight mb-2 text-[#44292E]">
+          {settings.portal_title || 'Our Space ✨'}
+        </h1>
+        <p className="text-xs text-[#7A5B61] font-medium animate-pulse" dir="auto">
+          جاري التحميل والتأكد من أحدث المفاجآت... 💕
+        </p>
+      </div>
+    );
+  }
+
+  // ── 2. DEDICATED BLOCKING LOCK SCREEN (Zero page content mounts underneath) ──
+  if ((gatekeeperStatus === 'locked' || settings.is_locked) && !bypassUnlocked) {
+    return (
+      <div
+        className="min-h-screen flex items-center justify-center p-4 relative overflow-hidden select-none"
+        style={{
+          background: `linear-gradient(175deg, ${settings.bg_primary || '#F8DCDA'} 0%, ${settings.bg_secondary || '#EFC0BD'} 100%)`,
+          fontFamily: `'Cairo', 'Playfair Display', sans-serif`,
+        }}
+      >
+        {/* Soft background ambient floating decor */}
+        <div className="absolute inset-0 pointer-events-none opacity-40 select-none">
+          <div className="absolute top-10 left-10 text-2xl animate-bounce">✨</div>
+          <div className="absolute top-1/4 right-8 text-2xl animate-pulse">🌸</div>
+          <div className="absolute bottom-20 left-12 text-3xl animate-pulse">💕</div>
+          <div className="absolute bottom-10 right-14 text-2xl animate-bounce">🐣</div>
+        </div>
+
+        <motion.div
+          initial={{ scale: 0.88, opacity: 0, y: 15 }}
+          animate={{ scale: 1, opacity: 1, y: 0 }}
+          transition={{ type: 'spring', damping: 25, stiffness: 300 }}
+          className="w-full max-w-sm rounded-3xl p-7 text-center shadow-2xl relative overflow-hidden z-10"
+          style={{
+            background: 'rgba(255, 255, 255, 0.92)',
+            backdropFilter: 'blur(24px)',
+            border: '1.5px solid rgba(255, 255, 255, 0.95)',
+            boxShadow: '0 25px 60px rgba(212, 140, 150, 0.4)',
+          }}
+        >
+          {/* Animated cute lock badge with chick & sparkles */}
+          <div className="relative w-22 h-22 mx-auto mb-5 flex items-center justify-center">
+            <motion.div
+              animate={{ scale: [1, 1.08, 1], rotate: [0, 4, -4, 0] }}
+              transition={{ repeat: Infinity, duration: 3, ease: 'easeInOut' }}
+              className="w-18 h-18 rounded-3xl flex items-center justify-center shadow-lg"
+              style={{
+                background: 'linear-gradient(135deg, #FF9A9E 0%, #FECFEF 100%)',
+              }}
+            >
+              <Lock size={32} className="text-white drop-shadow-sm" />
+            </motion.div>
+            <motion.span
+              animate={{ y: [-3, 3, -3], opacity: [0.7, 1, 0.7] }}
+              transition={{ repeat: Infinity, duration: 2 }}
+              className="absolute -top-1 -right-1 text-2xl"
+            >
+              ✨
+            </motion.span>
+            <motion.span
+              animate={{ scale: [1, 1.25, 1] }}
+              transition={{ repeat: Infinity, duration: 1.8 }}
+              className="absolute -bottom-1 -left-1 text-2xl"
+            >
+              🐣
+            </motion.span>
+          </div>
+
+          {/* User Requested Lock Message */}
+          <h2
+            className="text-xl md:text-2xl font-bold leading-relaxed mb-3 text-[#44292E]"
+            dir="auto"
+          >
+            {liveLockMsg || settings.lock_message || 'بعمل update علي السريع يا كتكوتي '}
+          </h2>
+
+          <p className="text-xs text-[#7A5B61] leading-relaxed mb-6 font-medium" dir="auto">
+            ثواني وهتلاقي كل حاجة جاهزة ومفاجآت جديدة ليكي 💕
+          </p>
+
+          {/* Sweet pulsing animated bar */}
+          <div className="w-40 h-2 mx-auto rounded-full bg-rose-200/60 overflow-hidden relative mb-5">
+            <motion.div
+              animate={{ x: [-160, 160] }}
+              transition={{ repeat: Infinity, duration: 1.6, ease: 'easeInOut' }}
+              className="w-24 h-full rounded-full bg-gradient-to-r from-rose-400 via-pink-500 to-rose-400 shadow-sm"
+            />
+          </div>
+
+          <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-rose-50 text-[11px] text-rose-600 font-semibold border border-rose-100 shadow-2xs">
+            <Sparkles size={12} className="animate-spin text-rose-500" />
+            <span>{settings.his_nickname || 'Bibo'} شغال عليها دلوقتي حالا ✨</span>
+          </div>
+
+          {/* Live auto-unlock note */}
+          <p className="text-[10px] text-rose-400/80 mt-4 font-normal" dir="auto">
+            هتفتح لوحدها تلقائياً أول ما يخلص 🤍
+          </p>
+        </motion.div>
+      </div>
+    );
+  }
 
   return (
     <div

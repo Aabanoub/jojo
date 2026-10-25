@@ -47,6 +47,37 @@ export let supabase: SupabaseClient | null = isSupabaseConfigured
   ? createClient(currentUrl, currentKey)
   : null;
 
+export function getSupabase(): SupabaseClient | null {
+  if (supabase) return supabase;
+  const url = getActiveUrl();
+  const key = getActiveKey();
+  if (url && key) {
+    currentUrl = url;
+    currentKey = key;
+    isSupabaseConfigured = true;
+    supabase = createClient(url, key);
+  }
+  return supabase;
+}
+
+// Asynchronously resolve credentials from server API if not yet present locally
+export async function resolveSupabaseCloud(): Promise<SupabaseClient | null> {
+  const existing = getSupabase();
+  if (existing) return existing;
+  if (typeof window !== 'undefined') {
+    try {
+      const res = await fetch('/api/portal-credentials');
+      if (res.ok) {
+        const data = await res.json();
+        if (data.url && data.key) {
+          return updateSupabaseConfig(data.url, data.key);
+        }
+      }
+    } catch { /* ignore */ }
+  }
+  return null;
+}
+
 // Reconfigure at runtime (e.g. from Host Studio Settings)
 export function updateSupabaseConfig(url: string, key: string): SupabaseClient | null {
   currentUrl = url.trim();
@@ -57,6 +88,12 @@ export function updateSupabaseConfig(url: string, key: string): SupabaseClient |
       if (currentUrl && currentKey) {
         localStorage.setItem('bibo_sb_url', currentUrl);
         localStorage.setItem('bibo_sb_key', currentKey);
+        // Also persist to server endpoint so other devices can discover it automatically
+        fetch('/api/portal-credentials', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ url: currentUrl, key: currentKey }),
+        }).catch(() => {});
       } else {
         localStorage.removeItem('bibo_sb_url');
         localStorage.removeItem('bibo_sb_key');
@@ -95,15 +132,16 @@ export async function uploadFileDetailed(
   path: string,
   file: File
 ): Promise<UploadResult> {
-  if (!supabase) return { url: null, error: 'Database is not connected on this device' };
-  const { error } = await supabase.storage.from(bucket).upload(path, file, {
+  const client = getSupabase();
+  if (!client) return { url: null, error: 'Database is not connected on this device' };
+  const { error } = await client.storage.from(bucket).upload(path, file, {
     upsert: true,
   });
   if (error) {
     console.error(`Upload error in bucket "${bucket}":`, error.message);
     return { url: null, error: error.message };
   }
-  const { data } = supabase.storage.from(bucket).getPublicUrl(path);
+  const { data } = client.storage.from(bucket).getPublicUrl(path);
   return { url: data.publicUrl };
 }
 
@@ -120,8 +158,9 @@ export async function getPublicUrl(
   bucket: string,
   path: string
 ): Promise<string> {
-  if (!supabase) return '';
-  const { data } = supabase.storage.from(bucket).getPublicUrl(path);
+  const client = getSupabase();
+  if (!client) return '';
+  const { data } = client.storage.from(bucket).getPublicUrl(path);
   return data.publicUrl;
 }
 

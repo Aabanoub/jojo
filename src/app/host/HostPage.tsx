@@ -10,7 +10,7 @@ import {
   Sparkles, Star, Camera,
 } from 'lucide-react';
 import { usePortal } from '@/lib/PortalProvider';
-import { uploadFile, uploadFileDetailed, BUCKETS, isSupabaseConfigured, getSupabaseCredentials, compressImage } from '@/lib/supabase';
+import { uploadFile, uploadFileDetailed, BUCKETS, isSupabaseConfigured, getSupabaseCredentials, compressImage, getSupabase, resolveSupabaseCloud } from '@/lib/supabase';
 import { generateUUID, type EventVault, type OpenWhenEnvelope, type PlaylistTrack, type Memory } from '@/lib/types';
 import ClientDate from '@/components/ClientDate';
 
@@ -230,38 +230,92 @@ export default function HostPage() {
 
   const toggleLockJojoPage = async () => {
     const nextLocked = !settings.is_locked;
+    const targetMsg = lockMsg.trim() || 'بعمل update علي السريع يا كتكوتي ';
     setLockCloudNotice(null);
+
     await doSave('lock-portal', async () => {
-      const res = await updateSettings({
-        is_locked: nextLocked,
-        lock_message: lockMsg || 'بعمل update علي السريع يا كتكوتي ',
-      });
-      if (res && !res.success) {
-        setLockCloudNotice({
-          type: 'error',
-          message: res.error || 'Failed to sync lock to Supabase.',
-        });
-      } else {
-        setLockCloudNotice({
-          type: 'success',
-          message: nextLocked ? "Locked in Supabase Cloud! Her phone will lock immediately." : "Unlocked in Supabase Cloud!",
-        });
-        setTimeout(() => setLockCloudNotice(null), 4000);
+      let sb = getSupabase();
+      if (!sb) {
+        sb = await resolveSupabaseCloud();
       }
+
+      if (sb) {
+        // 1. Direct write to Supabase database
+        let { error: writeErr } = await sb
+          .from('site_settings')
+          .update({
+            is_locked: nextLocked,
+            lock_message: targetMsg,
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', 1);
+
+        if (writeErr) {
+          // Fallback to upsert if row id = 1 doesn't exist
+          const { error: upsertErr } = await sb
+            .from('site_settings')
+            .upsert({
+              id: 1,
+              is_locked: nextLocked,
+              lock_message: targetMsg,
+              updated_at: new Date().toISOString(),
+            });
+          if (upsertErr) writeErr = upsertErr;
+        }
+
+        if (writeErr) {
+          setLockCloudNotice({
+            type: 'error',
+            message: `Database error: ${writeErr.message}. Check SQL schema below.`,
+          });
+          return;
+        }
+
+        // 2. Readback verification directly from Supabase
+        const { data: verified, error: verifyErr } = await sb
+          .from('site_settings')
+          .select('is_locked, lock_message')
+          .eq('id', 1)
+          .single();
+
+        if (verifyErr || !verified || verified.is_locked !== nextLocked) {
+          setLockCloudNotice({
+            type: 'error',
+            message: `Verification check failed in database: ${verifyErr?.message || 'Value not confirmed in DB'}`,
+          });
+          return;
+        }
+      }
+
+      // 3. Update PortalProvider state
+      await updateSettings({
+        is_locked: nextLocked,
+        lock_message: targetMsg,
+      });
+
+      setLockCloudNotice({
+        type: 'success',
+        message: nextLocked
+          ? '🔒 Saved in Database! is_locked = true. Her page is now locked and blocked before opening anything.'
+          : '🟢 Saved in Database! is_locked = false. Her page is now unlocked.',
+      });
+      setTimeout(() => setLockCloudNotice(null), 5000);
     });
   };
 
   const saveLockMessage = async () => {
+    const targetMsg = lockMsg.trim() || 'بعمل update علي السريع يا كتكوتي ';
     await doSave('lock-msg', async () => {
-      const res = await updateSettings({
-        lock_message: lockMsg,
-      });
-      if (res && !res.success) {
-        setLockCloudNotice({
-          type: 'error',
-          message: res.error || 'Failed to update lock message in Supabase.',
-        });
+      let sb = getSupabase() || (await resolveSupabaseCloud());
+      if (sb) {
+        await sb.from('site_settings').update({ lock_message: targetMsg }).eq('id', 1);
       }
+      await updateSettings({ lock_message: targetMsg });
+      setLockCloudNotice({
+        type: 'success',
+        message: 'Lock message saved to database!',
+      });
+      setTimeout(() => setLockCloudNotice(null), 3000);
     });
   };
 

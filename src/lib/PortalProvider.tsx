@@ -3,7 +3,7 @@
 import React, { createContext, useContext, useEffect, useState, useCallback, useRef } from 'react';
 import type { PortalState, SiteSettings, EventVault, OpenWhenEnvelope, PlaylistTrack, Memory, JojoSignal, UploadedAsset } from './types';
 import { DEFAULT_STATE } from './seed';
-import { supabase as initialSupabase, isSupabaseConfigured as initialConfigured, updateSupabaseConfig, getSupabaseCredentials } from './supabase';
+import { supabase as initialSupabase, isSupabaseConfigured as initialConfigured, updateSupabaseConfig, getSupabaseCredentials, getSupabase, resolveSupabaseCloud } from './supabase';
 import type { SupabaseClient } from '@supabase/supabase-js';
 
 const STORAGE_KEY = 'bibo_jojo_portal';
@@ -101,10 +101,10 @@ function saveLocal(state: PortalState) {
 // ── Provider Component ──────────────────────────────────────────────────────
 export function PortalProvider({ children }: { children: React.ReactNode }) {
   const [state, setState] = useState<PortalState>(DEFAULT_STATE);
-  const [client, setClient] = useState<SupabaseClient | null>(initialSupabase);
+  const [client, setClient] = useState<SupabaseClient | null>(() => getSupabase() || initialSupabase);
   const [cloudStatus, setCloudStatus] = useState<CloudStatus>({
     isConnected: false,
-    isConfigured: initialConfigured,
+    isConfigured: initialConfigured || !!getSupabase(),
     error: null,
     lastSynced: null,
   });
@@ -122,17 +122,18 @@ export function PortalProvider({ children }: { children: React.ReactNode }) {
 
   // ── Cloud fetch function ──────────────────────────────────────────────────
   const refreshFromCloud = useCallback(async () => {
-    if (!client) return;
+    const activeClient = client || getSupabase();
+    if (!activeClient) return;
     try {
       const [settingsRes, eventsRes, envelopesRes, tracksRes, memoriesRes, signalsRes, assetsRes] =
         await Promise.all([
-          client.from('site_settings').select('*').eq('id', 1).single(),
-          client.from('events_vault').select('*').order('created_at', { ascending: true }),
-          client.from('open_when_envelopes').select('*').order('sort_order', { ascending: true }),
-          client.from('playlist_tracks').select('*').order('sort_order', { ascending: true }),
-          client.from('memories').select('*').order('sort_order', { ascending: true }),
-          client.from('jojo_signals').select('*').order('created_at', { ascending: false }),
-          client.from('uploaded_assets').select('*').order('created_at', { ascending: false }),
+          activeClient.from('site_settings').select('*').eq('id', 1).single(),
+          activeClient.from('events_vault').select('*').order('created_at', { ascending: true }),
+          activeClient.from('open_when_envelopes').select('*').order('sort_order', { ascending: true }),
+          activeClient.from('playlist_tracks').select('*').order('sort_order', { ascending: true }),
+          activeClient.from('memories').select('*').order('sort_order', { ascending: true }),
+          activeClient.from('jojo_signals').select('*').order('created_at', { ascending: false }),
+          activeClient.from('uploaded_assets').select('*').order('created_at', { ascending: false }),
         ]);
 
       if (settingsRes.error) {
@@ -253,8 +254,19 @@ export function PortalProvider({ children }: { children: React.ReactNode }) {
     };
     window.addEventListener('storage', handleStorageEvent);
 
+    // Auto-discover credentials if not already configured
+    const activeClient = client || getSupabase();
+    if (!activeClient) {
+      resolveSupabaseCloud().then(resolved => {
+        if (resolved) {
+          setClient(resolved);
+          setCloudStatus(prev => ({ ...prev, isConfigured: true }));
+        }
+      });
+    }
+
     // If Supabase client exists: setup Realtime + 4s polling
-    if (client) {
+    if (activeClient) {
       refreshFromCloud();
 
       // Background cloud poll every 4 seconds (guarantees cross-device sync)
@@ -271,7 +283,7 @@ export function PortalProvider({ children }: { children: React.ReactNode }) {
       document.addEventListener('visibilitychange', handleVisibility);
 
       // Supabase Realtime channel subscription
-      const rtChannel = client
+      const rtChannel = activeClient
         .channel('portal-realtime')
         .on('postgres_changes', { event: '*', schema: 'public', table: 'site_settings' }, (payload) => {
           if (payload.new) {
@@ -283,32 +295,32 @@ export function PortalProvider({ children }: { children: React.ReactNode }) {
           }
         })
         .on('postgres_changes', { event: '*', schema: 'public', table: 'events_vault' }, () => {
-          client.from('events_vault').select('*').order('created_at').then(({ data }) => {
+          activeClient.from('events_vault').select('*').order('created_at').then(({ data }) => {
             if (Array.isArray(data)) setState(s => { const next = { ...s, events: data }; saveLocal(next); return next; });
           });
         })
         .on('postgres_changes', { event: '*', schema: 'public', table: 'open_when_envelopes' }, () => {
-          client.from('open_when_envelopes').select('*').order('sort_order').then(({ data }) => {
+          activeClient.from('open_when_envelopes').select('*').order('sort_order').then(({ data }) => {
             if (Array.isArray(data)) setState(s => { const next = { ...s, envelopes: data }; saveLocal(next); return next; });
           });
         })
         .on('postgres_changes', { event: '*', schema: 'public', table: 'playlist_tracks' }, () => {
-          client.from('playlist_tracks').select('*').order('sort_order').then(({ data }) => {
+          activeClient.from('playlist_tracks').select('*').order('sort_order').then(({ data }) => {
             if (Array.isArray(data)) setState(s => { const next = { ...s, tracks: data }; saveLocal(next); return next; });
           });
         })
         .on('postgres_changes', { event: '*', schema: 'public', table: 'memories' }, () => {
-          client.from('memories').select('*').order('sort_order').then(({ data }) => {
+          activeClient.from('memories').select('*').order('sort_order').then(({ data }) => {
             if (Array.isArray(data)) setState(s => { const next = { ...s, memories: data }; saveLocal(next); return next; });
           });
         })
         .on('postgres_changes', { event: '*', schema: 'public', table: 'jojo_signals' }, () => {
-          client.from('jojo_signals').select('*').order('created_at', { ascending: false }).then(({ data }) => {
+          activeClient.from('jojo_signals').select('*').order('created_at', { ascending: false }).then(({ data }) => {
             if (Array.isArray(data)) setState(s => { const next = { ...s, signals: data }; saveLocal(next); return next; });
           });
         })
         .on('postgres_changes', { event: '*', schema: 'public', table: 'uploaded_assets' }, () => {
-          client.from('uploaded_assets').select('*').order('created_at', { ascending: false }).then(({ data }) => {
+          activeClient.from('uploaded_assets').select('*').order('created_at', { ascending: false }).then(({ data }) => {
             if (Array.isArray(data)) setState(s => { const next = { ...s, assets: data }; saveLocal(next); return next; });
           });
         })
@@ -323,7 +335,7 @@ export function PortalProvider({ children }: { children: React.ReactNode }) {
         window.removeEventListener('focus', handleFocus);
         document.removeEventListener('visibilitychange', handleVisibility);
         window.removeEventListener('storage', handleStorageEvent);
-        client.removeChannel(rtChannel);
+        activeClient.removeChannel(rtChannel);
         bc?.close();
       };
     }
@@ -342,17 +354,18 @@ export function PortalProvider({ children }: { children: React.ReactNode }) {
       return next;
     });
 
-    if (client) {
+    const activeClient = client || getSupabase();
+    if (activeClient) {
       try {
         // Try update first (row id = 1 always exists)
-        const { error: updateErr } = await client
+        const { error: updateErr } = await activeClient
           .from('site_settings')
           .update({ ...updates, updated_at: new Date().toISOString() })
           .eq('id', 1);
 
         if (updateErr) {
           console.warn('Update site_settings failed, falling back to upsert:', updateErr.message);
-          const { error: upsertErr } = await client
+          const { error: upsertErr } = await activeClient
             .from('site_settings')
             .upsert({ id: 1, ...updates, updated_at: new Date().toISOString() });
           if (upsertErr) {
@@ -511,9 +524,10 @@ export function PortalProvider({ children }: { children: React.ReactNode }) {
       return next;
     });
 
-    if (client) {
+    const activeClient = client || getSupabase();
+    if (activeClient) {
       try {
-        const { error } = await client.from('memories').upsert(memory);
+        const { error } = await activeClient.from('memories').upsert(memory);
         if (error) {
           console.error('Supabase upsertMemory error:', error.message);
           setCloudStatus(prev => ({ ...prev, error: error.message }));
