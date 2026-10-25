@@ -2,6 +2,7 @@
 
 import React, { createContext, useContext, useEffect, useState, useCallback, useRef } from 'react';
 import type { PortalState, SiteSettings, EventVault, OpenWhenEnvelope, PlaylistTrack, Memory, JojoSignal, UploadedAsset } from './types';
+import { generateUUID } from './types';
 import { DEFAULT_STATE } from './seed';
 import { supabase as initialSupabase, isSupabaseConfigured as initialConfigured, updateSupabaseConfig, getSupabaseCredentials, getSupabase, resolveSupabaseCloud } from './supabase';
 import type { SupabaseClient } from '@supabase/supabase-js';
@@ -30,7 +31,7 @@ interface PortalContextType {
   deleteTrack: (id: string) => Promise<void>;
   upsertMemory: (memory: Memory) => Promise<{ success: boolean; error?: string }>;
   deleteMemory: (id: string) => Promise<void>;
-  sendSignal: (signal: Omit<JojoSignal, 'id' | 'created_at' | 'is_read'>) => Promise<void>;
+  sendSignal: (signal: Omit<JojoSignal, 'id' | 'created_at' | 'is_read'>) => Promise<{ success: boolean; error?: string }>;
   markSignalRead: (id: string) => Promise<void>;
   upsertAsset: (asset: UploadedAsset) => Promise<void>;
   deleteAsset: (idOrUrl: string) => Promise<void>;
@@ -111,6 +112,8 @@ export function PortalProvider({ children }: { children: React.ReactNode }) {
   });
 
   const channelRef = useRef<BroadcastChannel | null>(null);
+  const seenSignalIdsRef = useRef<Set<string>>(new Set());
+  const isInitialSignalsLoadRef = useRef(true);
   const isSupabaseMode = cloudStatus.isConfigured && !!client;
 
   // ── Broadcast to other tabs on same machine ──────────────────────────────
@@ -149,6 +152,26 @@ export function PortalProvider({ children }: { children: React.ReactNode }) {
         error: null,
         lastSynced: new Date(),
       });
+
+      // Check for incoming signals during background poll (ensures notifications arrive even when WebSocket pauses)
+      if (Array.isArray(signalsRes.data)) {
+        const cloudSignals = filterLegacy<JojoSignal>(signalsRes.data);
+        if (isInitialSignalsLoadRef.current) {
+          cloudSignals.forEach(s => seenSignalIdsRef.current.add(s.id));
+          isInitialSignalsLoadRef.current = false;
+        } else {
+          const newSignals = cloudSignals.filter(s => !seenSignalIdsRef.current.has(s.id));
+          if (newSignals.length > 0) {
+            newSignals.forEach(sig => {
+              seenSignalIdsRef.current.add(sig.id);
+              sendLoveNotification('New Notification', {
+                body: 'New notification',
+                tag: 'signal-' + sig.id,
+              });
+            });
+          }
+        }
+      }
 
       setState(prev => {
         const rawSettings = settingsRes.data ? { ...prev.settings, ...settingsRes.data } : prev.settings;
@@ -360,17 +383,13 @@ export function PortalProvider({ children }: { children: React.ReactNode }) {
           });
           if (payload.eventType === 'INSERT' && payload.new) {
             const sig = payload.new as JojoSignal;
-            const isSafety = typeof window !== 'undefined' && localStorage.getItem('jojo_safety_mode') === 'true';
-            const isFromBibo = sig.signal_type?.startsWith('bibo_') || sig.signal_type === 'push_alert';
-            const title = isSafety
-              ? 'Love Alert 💕'
-              : isFromBibo
-                ? `Love Signal from Bibo 💕`
-                : `Love Signal from Jojo 💕`;
-            sendLoveNotification(title, {
-              body: sig.message || 'You received a sweet love signal! ❤️',
-              tag: 'signal-' + sig.id,
-            });
+            if (!seenSignalIdsRef.current.has(sig.id)) {
+              seenSignalIdsRef.current.add(sig.id);
+              sendLoveNotification('New Notification', {
+                body: 'New notification',
+                tag: 'signal-' + sig.id,
+              });
+            }
           }
         })
         .on('postgres_changes', { event: '*', schema: 'public', table: 'uploaded_assets' }, () => {
@@ -622,13 +641,16 @@ export function PortalProvider({ children }: { children: React.ReactNode }) {
     }
   }, [client, broadcast]);
 
-  const sendSignal = useCallback(async (signal: Omit<JojoSignal, 'id' | 'created_at' | 'is_read'>) => {
+  const sendSignal = useCallback(async (signal: Omit<JojoSignal, 'id' | 'created_at' | 'is_read'>): Promise<{ success: boolean; error?: string }> => {
     const newSignal: JojoSignal = {
       ...signal,
-      id: typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `sig-${Date.now()}`,
+      id: generateUUID(),
       is_read: false,
       created_at: new Date().toISOString(),
     };
+
+    // Mark as seen locally so the sender does not get an echo notification
+    seenSignalIdsRef.current.add(newSignal.id);
 
     setState(prev => {
       const next = { ...prev, signals: [newSignal, ...prev.signals] };
@@ -636,14 +658,21 @@ export function PortalProvider({ children }: { children: React.ReactNode }) {
       return next;
     });
 
-    if (client) {
+    const activeClient = client || getSupabase();
+    if (activeClient) {
       try {
-        const { error } = await client.from('jojo_signals').insert(newSignal);
-        if (error) console.error('Supabase sendSignal error:', error.message);
+        const { error } = await activeClient.from('jojo_signals').insert(newSignal);
+        if (error) {
+          console.error('Supabase sendSignal error:', error.message);
+          return { success: false, error: error.message };
+        }
+        return { success: true };
       } catch (err: any) {
         console.error('Supabase sendSignal error:', err);
+        return { success: false, error: err?.message || 'Network error' };
       }
     }
+    return { success: false, error: 'Database is not connected on this device' };
   }, [client, broadcast]);
 
   const markSignalRead = useCallback(async (id: string) => {

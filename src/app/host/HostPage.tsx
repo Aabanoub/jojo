@@ -169,10 +169,14 @@ export default function HostPage() {
     if (!text) return;
     setSendingAlert(true);
     try {
-      await sendSignal({
+      const res = await sendSignal({
         signal_type: 'push_alert',
         message: text,
       });
+      if (res && !res.success) {
+        alert(`⚠️ Could not deliver signal to cloud database:\n${res.error}\n\nPlease verify your Supabase database connection in Settings.`);
+        return;
+      }
       setAlertSentSuccess(true);
       if (!msgToSend) setAlertText('');
       setTimeout(() => setAlertSentSuccess(false), 3500);
@@ -1271,12 +1275,46 @@ ALTER TABLE public.site_settings ADD COLUMN IF NOT EXISTS lock_message text DEFA
                             <span>Ping Jojo</span>
                             <span className="text-[10px] font-normal text-rose-300/80">(Sends discreet &quot;New Notification&quot; to Her Phone 📱)</span>
                           </span>
-                          {alertSentSuccess && (
-                            <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 text-[10px] font-medium flex items-center gap-1 animate-fade-in">
-                              <Check size={11} /> Sent to Jojo!
-                            </span>
-                          )}
+                          <div className="flex items-center gap-2">
+                            {sbUrl && sbKey && (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const url = `${window.location.origin}/?sb_url=${encodeURIComponent(sbUrl)}&sb_key=${encodeURIComponent(sbKey)}`;
+                                  navigator.clipboard.writeText(url);
+                                  setCopiedSyncLink(true);
+                                  setTimeout(() => setCopiedSyncLink(false), 2500);
+                                }}
+                                className="text-[10px] text-rose-300 hover:text-rose-100 underline cursor-pointer flex items-center gap-1"
+                                title="Copy link to send to Jojo so her phone connects automatically to your database"
+                              >
+                                <Copy size={10} />
+                                <span>{copiedSyncLink ? '✓ Copied Link for Jojo!' : 'Copy Jojo Link (Synced 🔗)'}</span>
+                              </button>
+                            )}
+                            {alertSentSuccess && (
+                              <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 text-[10px] font-medium flex items-center gap-1 animate-fade-in">
+                                <Check size={11} /> Sent to Jojo!
+                              </span>
+                            )}
+                          </div>
                         </div>
+
+                        {!cloudStatus.isConnected && (
+                          <div className="mb-3 p-2.5 rounded-xl bg-amber-500/15 border border-amber-500/30 flex items-center justify-between gap-2 text-[11px] text-amber-200">
+                            <div className="flex items-center gap-1.5 min-w-0">
+                              <AlertCircle size={13} className="text-amber-400 shrink-0" />
+                              <span className="truncate">Database Disconnected: Signals will not reach her phone.</span>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => setActiveNav('settings')}
+                              className="px-2.5 py-1 rounded-lg bg-amber-500/25 hover:bg-amber-500/40 text-amber-100 font-semibold text-[10px] shrink-0 cursor-pointer transition-colors"
+                            >
+                              Connect Cloud
+                            </button>
+                          </div>
+                        )}
 
                         {/* Quick Signal Preset Cards */}
                         <div className="grid grid-cols-2 gap-1.5 mb-2.5">

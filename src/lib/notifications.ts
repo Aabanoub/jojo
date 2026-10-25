@@ -7,6 +7,9 @@ export function playNotificationChime() {
     const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
     if (!AudioCtx) return;
     const ctx = new AudioCtx();
+    if (ctx.state === 'suspended') {
+      ctx.resume().catch(() => {});
+    }
 
     // Notes: C5 (523.25Hz) -> E5 (659.25Hz) -> G5 (783.99Hz)
     const notes = [523.25, 659.25, 783.99];
@@ -93,21 +96,21 @@ export async function sendLoveNotification(
     silent?: boolean;
   }
 ) {
-  if (!isNotificationSupported() || Notification.permission !== 'granted') {
-    return false;
-  }
-
-  // Play gentle chime
+  // Always play gentle chime and vibrate regardless of whether OS push notifications are allowed
   if (!options?.silent) {
     playNotificationChime();
   }
 
   // Vibrate mobile device
   try {
-    if ('vibrate' in navigator) {
+    if (typeof navigator !== 'undefined' && 'vibrate' in navigator) {
       navigator.vibrate([150, 80, 150]);
     }
   } catch { /* ignore */ }
+
+  if (!isNotificationSupported() || Notification.permission !== 'granted') {
+    return false;
+  }
 
   // Privacy Protection: Never expose names, messages, or letters on the phone lock screen!
   const discreetTitle = 'New Notification';

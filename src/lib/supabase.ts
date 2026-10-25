@@ -29,6 +29,13 @@ function getActiveKey(): string {
       const keyParam = params.get('sb_key');
       if (keyParam) {
         localStorage.setItem('bibo_sb_key', keyParam);
+        setTimeout(() => {
+          try {
+            if (typeof window !== 'undefined' && window.location.search.includes('sb_')) {
+              window.history.replaceState({}, document.title, window.location.pathname);
+            }
+          } catch { /* ignore */ }
+        }, 500);
         return keyParam;
       }
       const stored = localStorage.getItem('bibo_sb_key');

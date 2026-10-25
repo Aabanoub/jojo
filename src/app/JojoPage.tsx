@@ -10,7 +10,7 @@ import { usePortal } from '@/lib/PortalProvider';
 import { uploadFileDetailed, BUCKETS, isSupabaseConfigured, compressImage, getSupabase, resolveSupabaseCloud } from '@/lib/supabase';
 import { generateUUID, type Memory } from '@/lib/types';
 import { createNameMasker } from '@/lib/safety';
-import { getNotificationPermission, requestNotificationPermission, sendLoveNotification } from '@/lib/notifications';
+import { getNotificationPermission, requestNotificationPermission, sendLoveNotification, playNotificationChime } from '@/lib/notifications';
 import ParticleBackground from '@/components/ParticleBackground';
 import MusicPlayer from '@/components/MusicPlayer';
 import CountdownDisplay from '@/components/CountdownDisplay';
@@ -71,15 +71,20 @@ export default function JojoPage() {
   const displayDailyNoteContent = isSafetyMode ? mask(settings.daily_note_content) : settings.daily_note_content;
 
   // ── Push / Mobile Notifications State ──────────────────────────────────────
-  const [notifPermission, setNotifPermission] = useState<string>('default');
+  const [notifPermission, setNotifPermission] = useState<string>(() => {
+    if (typeof window !== 'undefined' && 'Notification' in window) {
+      return Notification.permission;
+    }
+    return 'unsupported';
+  });
   const [isRequestingNotif, setIsRequestingNotif] = useState(false);
   const [showNotifToast, setShowNotifToast] = useState(false);
-
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      setNotifPermission(getNotificationPermission());
+  const [showNotifBanner, setShowNotifBanner] = useState<boolean>(() => {
+    if (typeof window !== 'undefined' && 'Notification' in window) {
+      return Notification.permission === 'default';
     }
-  }, []);
+    return false;
+  });
 
   const handleEnableNotifications = async () => {
     setIsRequestingNotif(true);
@@ -87,6 +92,7 @@ export default function JojoPage() {
       const res = await requestNotificationPermission();
       setNotifPermission(res.permission);
       if (res.granted) {
+        setShowNotifBanner(false);
         setShowNotifToast(true);
         setTimeout(() => setShowNotifToast(false), 3000);
       }
@@ -152,18 +158,30 @@ export default function JojoPage() {
 
   // Live Incoming Signals from Bibo
   const [latestIncomingSignal, setLatestIncomingSignal] = useState<any | null>(null);
-  const prevSignalCountRef = useRef(signals.length);
+  const seenJojoSignalIdsRef = useRef<Set<string>>(new Set());
+  const isInitialSignalsRef = useRef(true);
 
   useEffect(() => {
-    if (signals.length > prevSignalCountRef.current) {
-      const newest = signals[0];
-      if (newest && (newest.signal_type?.startsWith('bibo_') || newest.signal_type === 'push_alert')) {
+    if (isInitialSignalsRef.current) {
+      signals.forEach(s => seenJojoSignalIdsRef.current.add(s.id));
+      if (signals.length > 0) isInitialSignalsRef.current = false;
+      return;
+    }
+    const newest = signals[0];
+    if (newest && !seenJojoSignalIdsRef.current.has(newest.id)) {
+      seenJojoSignalIdsRef.current.add(newest.id);
+      if (newest.signal_type?.startsWith('bibo_') || newest.signal_type === 'push_alert') {
         setLatestIncomingSignal(newest);
-        const timer = setTimeout(() => setLatestIncomingSignal(null), 7000);
+        playNotificationChime();
+        try {
+          if (typeof navigator !== 'undefined' && 'vibrate' in navigator) {
+            navigator.vibrate([200, 100, 200]);
+          }
+        } catch {}
+        const timer = setTimeout(() => setLatestIncomingSignal(null), 8000);
         return () => clearTimeout(timer);
       }
     }
-    prevSignalCountRef.current = signals.length;
   }, [signals]);
 
   const biboSignals = signals.filter(s => s.signal_type?.startsWith('bibo_') || s.signal_type === 'push_alert');
@@ -300,7 +318,11 @@ export default function JojoPage() {
   ];
 
   const handleSendPing = async (message: string) => {
-    await sendSignal({ signal_type: 'heart', message });
+    const res = await sendSignal({ signal_type: 'heart', message });
+    if (res && !res.success) {
+      alert(`⚠️ Could not send signal: ${res.error}\n\nPlease check cloud database connection.`);
+      return;
+    }
     setShowPingSuccess(true);
     setPingMessage('');
     setTimeout(() => setShowPingSuccess(false), 2500);
@@ -645,9 +667,62 @@ export default function JojoPage() {
           {displayPortalTitle}
         </span>
 
-        {/* Right: Music Player (PLAY & PAUSE BUTTON ONLY) */}
-        <MusicPlayer tracks={safeTracks} accentColor={settings.accent_color} />
+        {/* Right: Notification Bell & Music Player (PLAY & PAUSE BUTTON ONLY) */}
+        <div className="flex items-center gap-1.5 sm:gap-2">
+          {notifPermission !== 'granted' && (
+            <motion.button
+              whileHover={{ scale: 1.08 }}
+              whileTap={{ scale: 0.92 }}
+              onClick={handleEnableNotifications}
+              disabled={isRequestingNotif}
+              title="Tap to enable discreet phone notifications"
+              className="w-9 h-9 rounded-full flex items-center justify-center bg-white/80 hover:bg-white text-rose-500 border border-white/90 shadow-xs cursor-pointer animate-pulse"
+            >
+              <Bell size={16} />
+            </motion.button>
+          )}
+          <MusicPlayer tracks={safeTracks} accentColor={settings.accent_color} />
+        </div>
       </header>
+
+      {/* Floating Permission Prompt Banner for Jojo */}
+      <AnimatePresence>
+        {showNotifBanner && notifPermission === 'default' && (
+          <motion.div
+            initial={{ opacity: 0, y: 30 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 30 }}
+            className="fixed bottom-20 left-4 right-4 max-w-sm mx-auto z-50 p-3 rounded-2xl bg-white/95 backdrop-blur-xl border border-rose-300/40 shadow-2xl flex items-center justify-between gap-3 text-xs"
+          >
+            <div className="flex items-center gap-2.5 min-w-0">
+              <div className="w-8 h-8 rounded-full bg-rose-500/15 text-rose-500 flex items-center justify-center shrink-0">
+                <Bell size={15} className="animate-bounce" />
+              </div>
+              <div className="min-w-0">
+                <p className="font-semibold text-[#44292E] text-[11px] truncate">Private Notifications</p>
+                <p className="text-[10px] text-[#7A5B61] truncate">Discreet alerts when you receive signals</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-1.5 shrink-0">
+              <button
+                type="button"
+                onClick={handleEnableNotifications}
+                disabled={isRequestingNotif}
+                className="px-3 py-1 rounded-full bg-gradient-to-r from-rose-400 to-pink-500 text-white font-semibold text-[11px] shadow-xs active:scale-95 cursor-pointer hover:opacity-95"
+              >
+                {isRequestingNotif ? 'Enabling...' : 'Enable 🔔'}
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowNotifBanner(false)}
+                className="w-6 h-6 rounded-full flex items-center justify-center text-[#7A5B61] hover:text-[#44292E] text-[12px] cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Floating Toast Notification */}
       <AnimatePresence>
