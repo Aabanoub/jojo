@@ -975,6 +975,11 @@ export default function JojoPage() {
             className="inline-flex items-center gap-1.5 text-[11px] text-[#44292E]/40 hover:text-[#44292E]/80 transition-colors px-3 py-1.5 rounded-full hover:bg-white/40"
           >
             <span>🔒</span> {settings.his_nickname || 'Bibo'}&apos;s Host Studio
+            {!isSupabaseConfigured && (
+              <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-amber-500/15 text-amber-800 border border-amber-300 font-medium" title="This device is in local demo mode. Tap to connect Supabase database.">
+                ⚡ Offline Mode (Tap to Connect)
+              </span>
+            )}
           </a>
         </div>
       </main>

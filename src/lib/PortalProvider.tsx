@@ -20,7 +20,7 @@ interface PortalContextType {
   state: PortalState;
   isSupabaseMode: boolean;
   cloudStatus: CloudStatus;
-  updateSettings: (updates: Partial<SiteSettings>) => Promise<void>;
+  updateSettings: (updates: Partial<SiteSettings>) => Promise<{ success: boolean; error?: string }>;
   upsertEvent: (event: EventVault) => Promise<void>;
   deleteEvent: (id: string) => Promise<void>;
   upsertEnvelope: (envelope: OpenWhenEnvelope) => Promise<void>;
@@ -335,7 +335,7 @@ export function PortalProvider({ children }: { children: React.ReactNode }) {
   }, [client, refreshFromCloud]);
 
   // ── Unified Optimistic + Cloud Mutations ──────────────────────────────────
-  const updateSettings = useCallback(async (updates: Partial<SiteSettings>) => {
+  const updateSettings = useCallback(async (updates: Partial<SiteSettings>): Promise<{ success: boolean; error?: string }> => {
     setState(prev => {
       const next = { ...prev, settings: { ...prev.settings, ...updates, updated_at: new Date().toISOString() } };
       broadcast(next);
@@ -344,15 +344,30 @@ export function PortalProvider({ children }: { children: React.ReactNode }) {
 
     if (client) {
       try {
-        const { error } = await client.from('site_settings').upsert({ id: 1, ...updates, updated_at: new Date().toISOString() });
-        if (error) {
-          console.error('Supabase updateSettings error:', error.message);
-          setCloudStatus(prev => ({ ...prev, error: error.message }));
+        // Try update first (row id = 1 always exists)
+        const { error: updateErr } = await client
+          .from('site_settings')
+          .update({ ...updates, updated_at: new Date().toISOString() })
+          .eq('id', 1);
+
+        if (updateErr) {
+          console.warn('Update site_settings failed, falling back to upsert:', updateErr.message);
+          const { error: upsertErr } = await client
+            .from('site_settings')
+            .upsert({ id: 1, ...updates, updated_at: new Date().toISOString() });
+          if (upsertErr) {
+            console.error('Supabase updateSettings error:', upsertErr.message);
+            setCloudStatus(prev => ({ ...prev, error: upsertErr.message }));
+            return { success: false, error: upsertErr.message };
+          }
         }
+        return { success: true };
       } catch (err: any) {
         console.error('Supabase updateSettings error:', err);
+        return { success: false, error: err?.message || 'Network error' };
       }
     }
+    return { success: false, error: 'Database is not connected on this device' };
   }, [client, broadcast]);
 
   const upsertEvent = useCallback(async (event: EventVault) => {

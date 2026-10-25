@@ -157,7 +157,7 @@ export default function HostPage() {
     setIsAuthenticated(false);
   };
 
-  const doSave = useCallback(async (key: string, fn: () => Promise<void>) => {
+  const doSave = useCallback(async (key: string, fn: () => Promise<any>) => {
     setSaving(key);
     await fn();
     setSaving(null);
@@ -222,22 +222,47 @@ export default function HostPage() {
 
   // ── PORTAL LOCK / MAINTENANCE CONTROLS ──────────────────────────────────────
   const [lockMsg, setLockMsg] = useState(settings.lock_message || 'بعمل update علي السريع يا كتكوتي ');
+  const [lockCloudNotice, setLockCloudNotice] = useState<{ type: 'error' | 'success'; message: string } | null>(null);
+
   useEffect(() => {
     if (settings.lock_message) setLockMsg(settings.lock_message);
   }, [settings.lock_message]);
 
   const toggleLockJojoPage = async () => {
     const nextLocked = !settings.is_locked;
-    await doSave('lock-portal', () => updateSettings({
-      is_locked: nextLocked,
-      lock_message: lockMsg || 'بعمل update علي السريع يا كتكوتي ',
-    }));
+    setLockCloudNotice(null);
+    await doSave('lock-portal', async () => {
+      const res = await updateSettings({
+        is_locked: nextLocked,
+        lock_message: lockMsg || 'بعمل update علي السريع يا كتكوتي ',
+      });
+      if (res && !res.success) {
+        setLockCloudNotice({
+          type: 'error',
+          message: res.error || 'Failed to sync lock to Supabase.',
+        });
+      } else {
+        setLockCloudNotice({
+          type: 'success',
+          message: nextLocked ? "Locked in Supabase Cloud! Her phone will lock immediately." : "Unlocked in Supabase Cloud!",
+        });
+        setTimeout(() => setLockCloudNotice(null), 4000);
+      }
+    });
   };
 
   const saveLockMessage = async () => {
-    await doSave('lock-msg', () => updateSettings({
-      lock_message: lockMsg,
-    }));
+    await doSave('lock-msg', async () => {
+      const res = await updateSettings({
+        lock_message: lockMsg,
+      });
+      if (res && !res.success) {
+        setLockCloudNotice({
+          type: 'error',
+          message: res.error || 'Failed to update lock message in Supabase.',
+        });
+      }
+    });
   };
 
   // ── NEW ENVELOPE FORM ────────────────────────────────────────────────────────
@@ -788,6 +813,59 @@ export default function HostPage() {
                               <span>{saved === 'lock-msg' ? 'Saved' : 'Save Message'}</span>
                             </button>
                           </div>
+                        </div>
+
+                        {/* Cloud Sync Status & Error Notice */}
+                        {lockCloudNotice && (
+                          <div className={`mt-2.5 p-3 rounded-xl text-xs flex items-start gap-2 ${
+                            lockCloudNotice.type === 'error'
+                              ? 'bg-amber-500/15 border border-amber-500/30 text-amber-200'
+                              : 'bg-emerald-500/15 border border-emerald-500/30 text-emerald-200'
+                          }`}>
+                            {lockCloudNotice.type === 'error' ? (
+                              <AlertCircle size={15} className="shrink-0 text-amber-400 mt-0.5" />
+                            ) : (
+                              <Check size={15} className="shrink-0 text-emerald-400 mt-0.5" />
+                            )}
+                            <div className="space-y-1 flex-1 min-w-0">
+                              <p className="font-semibold">{lockCloudNotice.message}</p>
+                              {lockCloudNotice.type === 'error' && (
+                                <>
+                                  <p className="text-[11px] opacity-80">
+                                    If Supabase says column does not exist, run this in your Supabase SQL Editor:
+                                  </p>
+                                  <pre className="text-[9px] bg-black/50 p-2 rounded-lg font-mono text-amber-100 select-all overflow-x-auto">
+ALTER TABLE public.site_settings ADD COLUMN IF NOT EXISTS is_locked boolean NOT NULL DEFAULT false;
+ALTER TABLE public.site_settings ADD COLUMN IF NOT EXISTS lock_message text DEFAULT &apos;بعمل update علي السريع يا كتكوتي &apos;;
+                                  </pre>
+                                </>
+                              )}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Mobile Phone Sync Link Helper */}
+                        <div className="mt-3 pt-2.5 border-t border-white/5 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-[11px]">
+                          <div className="text-white/50 text-[10px]">
+                            <span>📱 Need to lock her phone? Make sure her phone is synced to your database:</span>
+                          </div>
+                          {sbUrl && sbKey ? (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const url = `${window.location.origin}/?sb_url=${encodeURIComponent(sbUrl)}&sb_key=${encodeURIComponent(sbKey)}`;
+                                navigator.clipboard.writeText(url);
+                                setCopiedSyncLink(true);
+                                setTimeout(() => setCopiedSyncLink(false), 2500);
+                              }}
+                              className="px-2.5 py-1.5 rounded-lg bg-rose-500/20 hover:bg-rose-500/30 text-rose-300 border border-rose-500/30 flex items-center justify-center gap-1.5 cursor-pointer font-medium text-[11px] shrink-0"
+                            >
+                              <Copy size={11} />
+                              <span>{copiedSyncLink ? '✓ Copied Phone Sync Link!' : 'Copy Auto-Sync Link For Her Phone'}</span>
+                            </button>
+                          ) : (
+                            <span className="text-[10px] text-amber-300/80">Connect Supabase in Settings below</span>
+                          )}
                         </div>
                       </div>
 
