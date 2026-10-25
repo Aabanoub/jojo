@@ -348,10 +348,50 @@ export default function HostPage() {
   // ── NEW TRACK FORM ────────────────────────────────────────────────────────────
   const [trackForm, setTrackForm] = useState({ title: '', artist: '', audio_url: '' });
   const [editTrackId, setEditTrackId] = useState<string | null>(null);
+  const [isUploadingAudio, setIsUploadingAudio] = useState(false);
+  const [audioUploadError, setAudioUploadError] = useState<string | null>(null);
+  const audioFileInputRef = useRef<HTMLInputElement | null>(null);
+
+  const handleAudioUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.size > 30 * 1024 * 1024) {
+      setAudioUploadError('Audio file is too large. Please select a file smaller than 30MB.');
+      return;
+    }
+
+    setIsUploadingAudio(true);
+    setAudioUploadError(null);
+    try {
+      const ext = file.name.split('.').pop() || 'mp3';
+      const cleanName = `${Date.now()}-${Math.random().toString(36).substring(2, 7)}.${ext}`;
+      const res = await uploadFileDetailed(BUCKETS.MUSIC, cleanName, file);
+
+      if (res.error || !res.url) {
+        setAudioUploadError(res.error || 'Failed to upload audio to Supabase Storage.');
+      } else {
+        const cleanTitle = file.name.replace(/\.[^/.]+$/, '').replace(/[_-]/g, ' ');
+        setTrackForm(f => ({
+          ...f,
+          audio_url: res.url!,
+          title: f.title.trim() ? f.title : cleanTitle,
+          artist: f.artist.trim() ? f.artist : (settings.his_nickname || 'Bibo & Jojo'),
+        }));
+      }
+    } catch (err: any) {
+      console.error('Audio upload error:', err);
+      setAudioUploadError(err?.message || 'Upload failed');
+    } finally {
+      setIsUploadingAudio(false);
+      if (audioFileInputRef.current) audioFileInputRef.current.value = '';
+    }
+  };
 
   const openEditTrack = (track: PlaylistTrack) => {
     setEditTrackId(track.id);
     setTrackForm({ title: track.title, artist: track.artist, audio_url: track.audio_url });
+    setAudioUploadError(null);
   };
 
   const saveTrack = async () => {
@@ -368,6 +408,7 @@ export default function HostPage() {
     await doSave('track', () => upsertTrack(track));
     setTrackForm({ title: '', artist: '', audio_url: '' });
     setEditTrackId(null);
+    setAudioUploadError(null);
   };
 
   // ── NEW MEMORY FORM ───────────────────────────────────────────────────────────
@@ -1726,25 +1767,81 @@ ALTER TABLE public.site_settings ADD COLUMN IF NOT EXISTS lock_message text DEFA
 
                     {/* Add / Edit Track */}
                     <Panel title={editTrackId ? 'Edit Track' : 'Add Track'} sub="Music & Notes">
-                      <div className="space-y-3">
+                      <div className="space-y-3.5">
+                        {/* Audio File Direct Upload */}
+                        <div>
+                          <label className="text-[11px] text-white/70 block mb-1.5 font-medium">
+                            Choose Song Audio File (MP3, M4A, WAV):
+                          </label>
+                          <input
+                            ref={audioFileInputRef}
+                            type="file"
+                            accept="audio/*,.mp3,.m4a,.wav,.ogg,.aac"
+                            onChange={handleAudioUpload}
+                            className="hidden"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => audioFileInputRef.current?.click()}
+                            disabled={isUploadingAudio}
+                            className="w-full p-4 rounded-xl border border-dashed border-rose-400/40 hover:border-rose-400 bg-rose-500/10 hover:bg-rose-500/15 flex flex-col items-center justify-center gap-1.5 transition-all cursor-pointer group"
+                          >
+                            {isUploadingAudio ? (
+                              <>
+                                <RotateCw size={20} className="animate-spin text-rose-400" />
+                                <span className="text-xs text-rose-300 font-semibold">Uploading song to cloud storage...</span>
+                                <span className="text-[10px] text-white/40">Hosted on high-speed CDN without loading the SQL database</span>
+                              </>
+                            ) : trackForm.audio_url ? (
+                              <>
+                                <div className="flex items-center gap-2 text-emerald-400 font-semibold text-xs">
+                                  <Check size={16} /> Audio File Ready!
+                                </div>
+                                <span className="text-[10px] text-white/50 max-w-[280px] truncate">{trackForm.audio_url}</span>
+                                <span className="text-[9px] text-rose-300/80 underline group-hover:text-rose-200">Click to choose a different audio file</span>
+                              </>
+                            ) : (
+                              <>
+                                <Upload size={20} className="text-rose-400 group-hover:scale-110 transition-transform" />
+                                <span className="text-xs text-white font-semibold">Click to select MP3 / Audio File</span>
+                                <span className="text-[10px] text-white/40">Uploads to Supabase Cloud Storage (Fast & Zero DB Load)</span>
+                              </>
+                            )}
+                          </button>
+
+                          {audioUploadError && (
+                            <p className="text-[11px] text-amber-300 mt-1.5 bg-amber-500/10 p-2 rounded-lg border border-amber-500/20">
+                              ⚠️ {audioUploadError}
+                            </p>
+                          )}
+                        </div>
+
+                        {/* Audio Preview if audio_url is set */}
+                        {trackForm.audio_url && (
+                          <div className="p-2.5 rounded-xl bg-white/5 border border-white/10 space-y-1">
+                            <span className="text-[10px] text-white/50 block font-medium">🎧 Preview Song:</span>
+                            <audio controls src={trackForm.audio_url} className="w-full h-8" />
+                          </div>
+                        )}
+
                         <FieldRow label="Song Title">
                           <DarkInput value={trackForm.title} onChange={(e) => setTrackForm(f => ({ ...f, title: e.target.value }))} placeholder="Our Song — Bibo & Jojo" />
                         </FieldRow>
                         <FieldRow label="Artist">
                           <DarkInput value={trackForm.artist} onChange={(e) => setTrackForm(f => ({ ...f, artist: e.target.value }))} placeholder="Bibo & Jojo" />
                         </FieldRow>
-                        <FieldRow label="Audio URL (public link or /audio/ path)">
+                        <FieldRow label="Audio URL (or paste external link)">
                           <DarkInput value={trackForm.audio_url} onChange={(e) => setTrackForm(f => ({ ...f, audio_url: e.target.value }))} placeholder="https://... or /audio/song.mp3" />
                         </FieldRow>
                         <p className="text-[10px] text-white/30">
-                          Use any public .mp3 / .ogg URL. For local files, place them in <code className="bg-white/10 px-1 rounded">public/audio/</code>.
+                          Uploaded songs are stored on Supabase Storage CDN and stream smoothly to Jojo&apos;s phone.
                         </p>
-                        <div className="flex gap-2">
-                          <SaveBtn onClick={saveTrack} saved={saved === 'track'} label={editTrackId ? 'Update Track' : 'Add Track'} />
+                        <div className="flex gap-2 pt-1">
+                          <SaveBtn onClick={saveTrack} saved={saved === 'track'} label={editTrackId ? 'Update Track' : 'Save Song to Playlist'} />
                           {editTrackId && (
                             <button
-                              onClick={() => { setEditTrackId(null); setTrackForm({ title: '', artist: '', audio_url: '' }); }}
-                              className="px-4 py-2 rounded-xl text-xs font-medium bg-white/5 border border-white/10 text-white/60 hover:bg-white/10"
+                              onClick={() => { setEditTrackId(null); setTrackForm({ title: '', artist: '', audio_url: '' }); setAudioUploadError(null); }}
+                              className="px-4 py-2 rounded-xl text-xs font-medium bg-white/5 border border-white/10 text-white/60 hover:bg-white/10 cursor-pointer"
                             >
                               Cancel
                             </button>
