@@ -33,8 +33,15 @@ create table if not exists public.site_settings (
   daily_note_title text not null default 'Daily Note from Bibo 💌 :',
   daily_note_content text not null default 'Good luck today my Jojo! Always remember how much Bibo loves you ❤️',
   daily_note_updated_at timestamptz not null default now(),
+  -- Maintenance / Portal Lock
+  is_locked boolean not null default false,
+  lock_message text default 'بعمل update علي السريع يا كتكوتي ',
   updated_at timestamptz not null default now()
 );
+
+-- Idempotent column additions for existing tables
+alter table public.site_settings add column if not exists is_locked boolean not null default false;
+alter table public.site_settings add column if not exists lock_message text default 'بعمل update علي السريع يا كتكوتي ';
 
 -- -------------------------------------------------------------------------
 -- 2. EVENTS & TIME-LOCKED VAULTS TABLE

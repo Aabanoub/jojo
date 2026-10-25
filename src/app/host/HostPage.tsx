@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-  LayoutDashboard, Palette, Lock, Image as ImageIcon, Music, Settings,
+  LayoutDashboard, Palette, Lock, Unlock, Image as ImageIcon, Music, Settings,
   Bell, Edit2, Play, Pause, ChevronDown, RotateCw, Plus, Trash2,
   Save, Check, X, Heart, Menu, ExternalLink, SkipForward, SkipBack,
   AlertCircle, Globe, Key, Calendar, User, FileText, Volume2, Upload, Copy,
@@ -217,6 +217,26 @@ export default function HostPage() {
       daily_note_title: dailyNoteTitle,
       daily_note_content: dailyNote,
       daily_note_updated_at: new Date().toISOString(),
+    }));
+  };
+
+  // ── PORTAL LOCK / MAINTENANCE CONTROLS ──────────────────────────────────────
+  const [lockMsg, setLockMsg] = useState(settings.lock_message || 'بعمل update علي السريع يا كتكوتي ');
+  useEffect(() => {
+    if (settings.lock_message) setLockMsg(settings.lock_message);
+  }, [settings.lock_message]);
+
+  const toggleLockJojoPage = async () => {
+    const nextLocked = !settings.is_locked;
+    await doSave('lock-portal', () => updateSettings({
+      is_locked: nextLocked,
+      lock_message: lockMsg || 'بعمل update علي السريع يا كتكوتي ',
+    }));
+  };
+
+  const saveLockMessage = async () => {
+    await doSave('lock-msg', () => updateSettings({
+      lock_message: lockMsg,
     }));
   };
 
@@ -581,7 +601,28 @@ export default function HostPage() {
             </div>
           )}
 
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2.5">
+            {/* Lock Jojo's Page Header Button */}
+            <button
+              onClick={toggleLockJojoPage}
+              disabled={saving === 'lock-portal'}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold transition-all shadow-sm cursor-pointer ${
+                settings.is_locked
+                  ? 'bg-rose-500/25 text-rose-300 border border-rose-500/50 animate-pulse hover:bg-rose-500/35'
+                  : 'bg-white/5 text-white/70 border border-white/10 hover:bg-rose-500/15 hover:text-rose-200 hover:border-rose-400/40'
+              }`}
+              title={settings.is_locked ? "Click to unlock Jojo's page" : "Click to lock Jojo's page and write: بعمل update علي السريع يا كتكوتي "}
+            >
+              {saving === 'lock-portal' ? (
+                <RotateCw size={11} className="animate-spin text-rose-300" />
+              ) : settings.is_locked ? (
+                <Lock size={11} className="text-rose-400" />
+              ) : (
+                <Unlock size={11} className="text-white/50" />
+              )}
+              <span>{settings.is_locked ? "Page Locked 🔒" : "Lock Her Page"}</span>
+            </button>
+
             <span className="text-[11px] text-white/40 font-mono border border-white/10 px-2 py-0.5 rounded-full flex items-center gap-1">
               <Key size={10} className="text-amber-400" /> {settings.master_password}
             </span>
@@ -667,6 +708,89 @@ export default function HostPage() {
                           </div>
                         ))}
                       </div>
+
+                      {/* ── Jojo's Page Lock (Maintenance Mode) Card ─────────── */}
+                      <div
+                        className={`mt-3 p-4 rounded-xl border transition-all duration-300 ${
+                          settings.is_locked
+                            ? 'bg-rose-950/20 border-rose-500/40 shadow-lg ring-1 ring-rose-500/30'
+                            : 'bg-[#282632] border-white/6 hover:border-white/15'
+                        }`}
+                      >
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-3">
+                          <div className="flex items-start sm:items-center gap-2.5">
+                            <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${settings.is_locked ? 'bg-rose-500/20 text-rose-300' : 'bg-white/5 text-white/50'}`}>
+                              {settings.is_locked ? <Lock size={18} /> : <Unlock size={18} />}
+                            </div>
+                            <div>
+                              <div className="flex items-center gap-2">
+                                <h4 className="text-xs font-semibold text-white">
+                                  Lock Jojo&apos;s Page (Maintenance Mode)
+                                </h4>
+                                {settings.is_locked ? (
+                                  <span className="px-2 py-0.5 rounded-full text-[9px] font-bold bg-rose-500/25 text-rose-300 border border-rose-500/40 animate-pulse">
+                                    LOCKED 🔴
+                                  </span>
+                                ) : (
+                                  <span className="px-2 py-0.5 rounded-full text-[9px] font-medium bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">
+                                    LIVE 🟢
+                                  </span>
+                                )}
+                              </div>
+                              <p className="text-[10px] text-white/40 mt-0.5">
+                                Displays a sweet lock overlay on her phone while you make updates or add surprises.
+                              </p>
+                            </div>
+                          </div>
+
+                          <button
+                            onClick={toggleLockJojoPage}
+                            disabled={saving === 'lock-portal'}
+                            className={`px-4 py-2 rounded-xl text-xs font-bold transition-all shadow-md active:scale-95 cursor-pointer shrink-0 flex items-center justify-center gap-1.5 ${
+                              settings.is_locked
+                                ? 'bg-gradient-to-r from-emerald-500 to-teal-500 text-white hover:brightness-110'
+                                : 'bg-gradient-to-r from-rose-500 to-pink-500 text-white hover:brightness-110'
+                            }`}
+                          >
+                            {saving === 'lock-portal' ? (
+                              <RotateCw size={12} className="animate-spin" />
+                            ) : settings.is_locked ? (
+                              <>
+                                <Unlock size={12} /> Unlock Her Page
+                              </>
+                            ) : (
+                              <>
+                                <Lock size={12} /> Lock Her Page Now
+                              </>
+                            )}
+                          </button>
+                        </div>
+
+                        {/* Lock message editor */}
+                        <div className="pt-2.5 border-t border-white/5 space-y-1.5">
+                          <label className="text-[10px] text-white/50 block font-medium">
+                            Lock message displayed to her:
+                          </label>
+                          <div className="flex gap-2">
+                            <DarkInput
+                              value={lockMsg}
+                              onChange={(e) => setLockMsg(e.target.value)}
+                              placeholder="بعمل update علي السريع يا كتكوتي "
+                              dir="auto"
+                            />
+                            <button
+                              type="button"
+                              onClick={saveLockMessage}
+                              disabled={saving === 'lock-msg'}
+                              className="px-3 py-2 rounded-xl bg-white/10 hover:bg-white/15 border border-white/15 text-xs text-white shrink-0 flex items-center gap-1 transition-colors cursor-pointer"
+                            >
+                              {saved === 'lock-msg' ? <Check size={12} className="text-emerald-400" /> : <Save size={12} />}
+                              <span>{saved === 'lock-msg' ? 'Saved' : 'Save Message'}</span>
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+
                       {/* Daily Note Preview & Live Editor */}
                       <div
                         ref={dailyNoteEditorRef}
@@ -1821,67 +1945,86 @@ export default function HostPage() {
               <div className="absolute top-2.5 left-1/2 -translate-x-1/2 w-16 h-4 bg-black rounded-full z-50" />
 
               {/* Screen Content */}
-              <div className="flex-1 overflow-hidden pt-7 px-3 text-[#44292E] flex flex-col">
-                <div className="flex items-center justify-between mb-2 px-0.5">
-                  <span className="text-[10px] font-bold" style={{ fontFamily: "'Playfair Display', serif" }}>{settings.portal_title}</span>
-                  <span className="text-[9px] opacity-50">✨</span>
-                </div>
-
-                {/* Daily Note preview */}
-                <div
-                  onClick={() => {
-                    setActiveNav('dashboard');
-                    setIsEditingDailyNote(true);
-                    dailyNoteEditorRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                  }}
-                  className="rounded-xl p-2 bg-white/50 mb-2 border border-white/60 cursor-pointer hover:bg-white/75 hover:border-rose-400/50 transition-all group relative shadow-sm"
-                  title="Click to edit Daily Note"
-                >
-                  <div className="flex items-center justify-between mb-0.5">
-                    <p className="text-[9px] font-medium opacity-60 truncate">
-                      {settings.daily_note_title || `Daily Note from ${settings.his_nickname || 'Bibo'} 💌 :`}
+              <div className="flex-1 overflow-hidden pt-7 px-3 text-[#44292E] flex flex-col relative">
+                {settings.is_locked ? (
+                  <div className="flex-1 flex flex-col items-center justify-center p-3 text-center bg-white/75 rounded-2xl border border-rose-200/80 shadow-xs my-2">
+                    <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-rose-400 to-pink-300 flex items-center justify-center text-white mb-2 shadow-sm">
+                      <Lock size={18} />
+                    </div>
+                    <p className="text-[11px] font-bold text-[#44292E] leading-snug px-1" dir="auto">
+                      {settings.lock_message || 'بعمل update علي السريع يا كتكوتي '}
                     </p>
-                    <Edit2 size={8} className="opacity-0 group-hover:opacity-70 text-[#3E2328] transition-opacity shrink-0" />
+                    <span className="text-[9px] text-[#7A5B61] mt-1.5 opacity-80" dir="auto">
+                      ثواني وهتلاقي كل حاجة جاهزة 💕
+                    </span>
+                    <div className="mt-3 px-2 py-0.5 rounded-full bg-rose-50 text-[8px] text-rose-500 font-semibold border border-rose-100 animate-pulse">
+                      🔴 Screen Locked
+                    </div>
                   </div>
-                  <p className="text-[9px] leading-snug opacity-80 line-clamp-2" dir="auto">{settings.daily_note_content}</p>
-                </div>
+                ) : (
+                  <>
+                    <div className="flex items-center justify-between mb-2 px-0.5">
+                      <span className="text-[10px] font-bold" style={{ fontFamily: "'Playfair Display', serif" }}>{settings.portal_title}</span>
+                      <span className="text-[9px] opacity-50">✨</span>
+                    </div>
 
-                {/* Countdown preview */}
-                <div
-                  onClick={() => setActiveNav('events')}
-                  className="rounded-xl p-2 bg-white/50 mb-2 border border-white/60 text-center cursor-pointer hover:bg-white/75 hover:border-rose-400/50 transition-all group"
-                  title="Click to manage countdown events"
-                >
-                  <p className="text-[9px] font-bold text-[#3E2328]" style={{ fontFamily: "'Playfair Display', serif" }}>
-                    {(events.find(e => e.is_featured) || events[0])?.title || "No Upcoming Event"}
-                  </p>
-                  <div className="flex justify-center gap-2 mt-1">
-                    {['DD', 'HH', 'MM', 'SS'].map((u) => (
-                      <div key={u} className="flex flex-col items-center">
-                        <span className="text-[11px] font-bold text-[#3E2328]">--</span>
-                        <span className="text-[7px] text-[#7A5B61]">{u}</span>
+                    {/* Daily Note preview */}
+                    <div
+                      onClick={() => {
+                        setActiveNav('dashboard');
+                        setIsEditingDailyNote(true);
+                        dailyNoteEditorRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                      }}
+                      className="rounded-xl p-2 bg-white/50 mb-2 border border-white/60 cursor-pointer hover:bg-white/75 hover:border-rose-400/50 transition-all group relative shadow-sm"
+                      title="Click to edit Daily Note"
+                    >
+                      <div className="flex items-center justify-between mb-0.5">
+                        <p className="text-[9px] font-medium opacity-60 truncate">
+                          {settings.daily_note_title || `Daily Note from ${settings.his_nickname || 'Bibo'} 💌 :`}
+                        </p>
+                        <Edit2 size={8} className="opacity-0 group-hover:opacity-70 text-[#3E2328] transition-opacity shrink-0" />
                       </div>
-                    ))}
-                  </div>
-                </div>
+                      <p className="text-[9px] leading-snug opacity-80 line-clamp-2" dir="auto">{settings.daily_note_content}</p>
+                    </div>
 
-                {/* Photo preview */}
-                <div className="flex justify-center">
-                  <div
-                    className="w-20 h-20 rounded-2xl overflow-hidden border-2 shadow-md bg-white/40 flex items-center justify-center text-rose-300"
-                    style={{ borderColor: settings.accent_color + '80' }}
-                  >
-                    {(memories.find(m => !!m.image_url)?.image_url || assets[0]?.url) ? (
-                      <img
-                        src={memories.find(m => !!m.image_url)?.image_url || assets[0]?.url}
-                        alt="Preview"
-                        className="w-full h-full object-cover"
-                      />
-                    ) : (
-                      <Camera size={20} className="opacity-40" />
-                    )}
-                  </div>
-                </div>
+                    {/* Countdown preview */}
+                    <div
+                      onClick={() => setActiveNav('events')}
+                      className="rounded-xl p-2 bg-white/50 mb-2 border border-white/60 text-center cursor-pointer hover:bg-white/75 hover:border-rose-400/50 transition-all group"
+                      title="Click to manage countdown events"
+                    >
+                      <p className="text-[9px] font-bold text-[#3E2328]" style={{ fontFamily: "'Playfair Display', serif" }}>
+                        {(events.find(e => e.is_featured) || events[0])?.title || "No Upcoming Event"}
+                      </p>
+                      <div className="flex justify-center gap-2 mt-1">
+                        {['DD', 'HH', 'MM', 'SS'].map((u) => (
+                          <div key={u} className="flex flex-col items-center">
+                            <span className="text-[11px] font-bold text-[#3E2328]">--</span>
+                            <span className="text-[7px] text-[#7A5B61]">{u}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Photo preview */}
+                    <div className="flex justify-center">
+                      <div
+                        className="w-20 h-20 rounded-2xl overflow-hidden border-2 shadow-md bg-white/40 flex items-center justify-center text-rose-300"
+                        style={{ borderColor: settings.accent_color + '80' }}
+                      >
+                        {(memories.find(m => !!m.image_url)?.image_url || assets[0]?.url) ? (
+                          <img
+                            src={memories.find(m => !!m.image_url)?.image_url || assets[0]?.url}
+                            alt="Preview"
+                            className="w-full h-full object-cover"
+                          />
+                        ) : (
+                          <Camera size={20} className="opacity-40" />
+                        )}
+                      </div>
+                    </div>
+                  </>
+                )}
               </div>
 
               {/* Bottom Nav preview */}

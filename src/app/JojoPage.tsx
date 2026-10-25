@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Home, Lock, Mail, Camera, Heart, ChevronDown, Send, Clock } from 'lucide-react';
+import { Home, Lock, Mail, Camera, Heart, ChevronDown, Send, Clock, Sparkles } from 'lucide-react';
 import { usePortal } from '@/lib/PortalProvider';
 import ParticleBackground from '@/components/ParticleBackground';
 import MusicPlayer from '@/components/MusicPlayer';
@@ -82,6 +82,92 @@ export default function JojoPage() {
 
       {/* Floating Music Player pill in top right */}
       <MusicPlayer tracks={tracks} accentColor={settings.accent_color} />
+
+      {/* ─────────────────────────────────────────────────────────────
+          PORTAL LOCK OVERLAY (When Bibo locks her page)
+         ───────────────────────────────────────────────────────────── */}
+      <AnimatePresence>
+        {settings.is_locked && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center p-4 backdrop-blur-md"
+            style={{
+              background: 'rgba(255, 240, 243, 0.88)',
+            }}
+          >
+            <motion.div
+              initial={{ scale: 0.85, y: 20 }}
+              animate={{ scale: 1, y: 0 }}
+              exit={{ scale: 0.85, y: 20 }}
+              transition={{ type: 'spring', damping: 25, stiffness: 300 }}
+              className="w-full max-w-sm rounded-3xl p-6 text-center shadow-2xl relative overflow-hidden"
+              style={{
+                background: 'rgba(255, 255, 255, 0.9)',
+                backdropFilter: 'blur(20px)',
+                border: '1.5px solid rgba(255, 255, 255, 0.95)',
+                boxShadow: '0 20px 50px rgba(212, 140, 150, 0.35)',
+              }}
+            >
+              {/* Cute glowing lock badge with chick & sparkles */}
+              <div className="relative w-20 h-20 mx-auto mb-4 flex items-center justify-center">
+                <motion.div
+                  animate={{ scale: [1, 1.1, 1], rotate: [0, 4, -4, 0] }}
+                  transition={{ repeat: Infinity, duration: 3, ease: 'easeInOut' }}
+                  className="w-16 h-16 rounded-3xl flex items-center justify-center shadow-lg"
+                  style={{
+                    background: 'linear-gradient(135deg, #FF9A9E 0%, #FECFEF 100%)',
+                  }}
+                >
+                  <Lock size={30} className="text-white drop-shadow-sm" />
+                </motion.div>
+                <motion.span
+                  animate={{ y: [-2, 3, -2], opacity: [0.7, 1, 0.7] }}
+                  transition={{ repeat: Infinity, duration: 2 }}
+                  className="absolute -top-1 -right-1 text-2xl"
+                >
+                  ✨
+                </motion.span>
+                <motion.span
+                  animate={{ scale: [1, 1.2, 1] }}
+                  transition={{ repeat: Infinity, duration: 1.8 }}
+                  className="absolute -bottom-1 -left-1 text-2xl"
+                >
+                  🐣
+                </motion.span>
+              </div>
+
+              {/* Romantic Lock Message Requested by User */}
+              <h2
+                className="text-xl md:text-2xl font-bold leading-relaxed mb-2.5 text-[#44292E]"
+                style={{ fontFamily: "'Cairo', 'Playfair Display', sans-serif" }}
+                dir="auto"
+              >
+                {settings.lock_message || 'بعمل update علي السريع يا كتكوتي '}
+              </h2>
+
+              <p className="text-xs text-[#7A5B61] leading-relaxed mb-5 font-medium" dir="auto">
+                ثواني وهتلاقي كل حاجة جاهزة ومفاجآت جديدة ليكي 💕
+              </p>
+
+              {/* Sweet animated pulsing bar */}
+              <div className="w-36 h-1.5 mx-auto rounded-full bg-rose-200/50 overflow-hidden relative mb-4">
+                <motion.div
+                  animate={{ x: [-150, 150] }}
+                  transition={{ repeat: Infinity, duration: 1.8, ease: 'easeInOut' }}
+                  className="w-20 h-full rounded-full bg-gradient-to-r from-rose-400 to-pink-500 shadow-sm"
+                />
+              </div>
+
+              <div className="inline-flex items-center gap-1.5 px-3.5 py-1 rounded-full bg-rose-50 text-[11px] text-rose-500 font-medium border border-rose-100">
+                <Sparkles size={11} className="animate-spin" />
+                <span>{settings.his_nickname || 'Bibo'} شغال عليها دلوقتي حالا ✨</span>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Main Container */}
       <main className="relative z-10 max-w-md mx-auto px-4 pb-28 pt-4">

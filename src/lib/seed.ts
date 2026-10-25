@@ -22,6 +22,8 @@ export const DEFAULT_SETTINGS: SiteSettings = {
   daily_note_title: 'Daily Note 💌 :',
   daily_note_content: '',
   daily_note_updated_at: new Date().toISOString(),
+  is_locked: false,
+  lock_message: 'بعمل update علي السريع يا كتكوتي ',
   updated_at: new Date().toISOString(),
 };
 

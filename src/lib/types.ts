@@ -22,6 +22,8 @@ export interface SiteSettings {
   daily_note_title: string;
   daily_note_content: string;
   daily_note_updated_at: string;
+  is_locked?: boolean;
+  lock_message?: string;
   updated_at: string;
 }
 
