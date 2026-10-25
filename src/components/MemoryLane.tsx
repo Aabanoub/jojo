@@ -7,9 +7,10 @@ import type { Memory } from '@/lib/types';
 interface MemoryLaneProps {
   memories: Memory[];
   accentColor: string;
+  onAddMemory?: () => void;
 }
 
-export default function MemoryLane({ memories, accentColor }: MemoryLaneProps) {
+export default function MemoryLane({ memories, accentColor, onAddMemory }: MemoryLaneProps) {
   if (!memories || memories.length === 0) {
     return (
       <div
@@ -28,8 +29,19 @@ export default function MemoryLane({ memories, accentColor }: MemoryLaneProps) {
           No Memories Added Yet
         </h3>
         <p className="text-xs text-[#7A5B61] mt-1 max-w-xs mx-auto">
-          Add special dates and polaroid photos in Host Studio to build your timeline!
+          Add special dates, stories, and photos to build your Memory Lane together! 💕
         </p>
+        {onAddMemory && (
+          <button
+            onClick={onAddMemory}
+            className="mt-3 inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-semibold text-white shadow-sm hover:scale-105 active:scale-95 transition-all cursor-pointer"
+            style={{
+              background: 'linear-gradient(135deg, #E08594 0%, #C46D7D 100%)',
+            }}
+          >
+            <span>+ Add First Memory 📷</span>
+          </button>
+        )}
       </div>
     );
   }

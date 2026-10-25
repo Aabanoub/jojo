@@ -1,9 +1,14 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Home, Lock, Mail, Camera, Heart, ChevronDown, Send, Clock, Sparkles } from 'lucide-react';
+import {
+  Home, Lock, Mail, Camera, Heart, ChevronDown, Send, Clock, Sparkles,
+  Plus, Upload, RotateCw, Check, X,
+} from 'lucide-react';
 import { usePortal } from '@/lib/PortalProvider';
+import { uploadFile, BUCKETS, isSupabaseConfigured } from '@/lib/supabase';
+import type { Memory } from '@/lib/types';
 import ParticleBackground from '@/components/ParticleBackground';
 import MusicPlayer from '@/components/MusicPlayer';
 import CountdownDisplay from '@/components/CountdownDisplay';
@@ -15,7 +20,7 @@ import ClientDate from '@/components/ClientDate';
 type TabId = 'home' | 'vault' | 'envelopes' | 'memories' | 'ping';
 
 export default function JojoPage() {
-  const { state, sendSignal } = usePortal();
+  const { state, sendSignal, upsertMemory, upsertAsset } = usePortal();
   const { settings, events, envelopes, tracks, memories } = state;
   const [activeTab, setActiveTab] = useState<TabId>('home');
   const [showTogetherDetail, setShowTogetherDetail] = useState(false);
@@ -23,6 +28,18 @@ export default function JojoPage() {
   const [pingMessage, setPingMessage] = useState('');
   const [showPingSuccess, setShowPingSuccess] = useState(false);
   const [togetherStr, setTogetherStr] = useState('');
+
+  // Add Memory Modal State for Jojo
+  const [showAddMemory, setShowAddMemory] = useState(false);
+  const [memTitle, setMemTitle] = useState('');
+  const [memDate, setMemDate] = useState(() => new Date().toISOString().split('T')[0]);
+  const [memCaption, setMemCaption] = useState('');
+  const [memImageUrl, setMemImageUrl] = useState('');
+  const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
+  const [isSavingMem, setIsSavingMem] = useState(false);
+  const [memSaveSuccess, setMemSaveSuccess] = useState(false);
+  const [showUrlInput, setShowUrlInput] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   // Find featured event or fallback to first
   const featuredEvent = events.find(e => e.is_featured) || events[0] || null;
@@ -66,6 +83,90 @@ export default function JojoPage() {
     setShowPingSuccess(true);
     setPingMessage('');
     setTimeout(() => setShowPingSuccess(false), 2500);
+  };
+
+  const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsUploadingPhoto(true);
+    try {
+      let url = '';
+      if (isSupabaseConfigured) {
+        const ext = file.name.split('.').pop() || 'jpg';
+        const cleanName = `${Date.now()}-${Math.random().toString(36).substring(2, 7)}.${ext}`;
+        const uploadedUrl = await uploadFile(BUCKETS.MEMORIES, cleanName, file);
+        if (uploadedUrl) {
+          url = uploadedUrl;
+        }
+      }
+
+      if (!url) {
+        url = await new Promise<string>((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(reader.result as string);
+          reader.onerror = reject;
+          reader.readAsDataURL(file);
+        });
+      }
+
+      await upsertAsset({
+        id: `ast-${Date.now()}`,
+        name: file.name,
+        url,
+        created_at: new Date().toISOString(),
+      });
+
+      setMemImageUrl(url);
+    } catch (err) {
+      console.error('Photo upload failed:', err);
+      alert('Photo upload failed. Please try again or paste a link.');
+    } finally {
+      setIsUploadingPhoto(false);
+      if (e.target) e.target.value = '';
+    }
+  };
+
+  const handleSaveMemory = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    if (!memTitle.trim()) return;
+
+    setIsSavingMem(true);
+    try {
+      const newMemory: Memory = {
+        id: `mem-${Date.now()}`,
+        title: memTitle.trim(),
+        memory_date: memDate || new Date().toISOString().split('T')[0],
+        caption: memCaption.trim() || null,
+        image_url: memImageUrl.trim(),
+        sort_order: memories.length + 1,
+        created_at: new Date().toISOString(),
+      };
+
+      await upsertMemory(newMemory);
+
+      // Notify Bibo live
+      await sendSignal({
+        signal_type: 'camera',
+        message: `${settings.her_nickname || 'Jojo'} added a new memory: "${newMemory.title}" 📷💕`,
+      });
+
+      setMemSaveSuccess(true);
+      setTimeout(() => {
+        setMemSaveSuccess(false);
+        setShowAddMemory(false);
+        setMemTitle('');
+        setMemCaption('');
+        setMemImageUrl('');
+        setShowUrlInput(false);
+        setMemDate(new Date().toISOString().split('T')[0]);
+      }, 1200);
+    } catch (err) {
+      console.error('Failed to save memory:', err);
+      alert('Could not save memory. Please check your connection.');
+    } finally {
+      setIsSavingMem(false);
+    }
   };
 
   return (
@@ -495,26 +596,287 @@ export default function JojoPage() {
             exit={{ opacity: 0 }}
             className="space-y-4"
           >
-            <header className="pt-1">
-              <h1
-                className="text-2xl font-bold tracking-tight"
+            <header className="pt-1 flex items-center justify-between gap-3">
+              <div>
+                <h1
+                  className="text-2xl font-bold tracking-tight"
+                  style={{
+                    fontFamily: `'${settings.heading_font || 'Playfair Display'}', serif`,
+                    color: settings.text_primary || '#44292E',
+                  }}
+                >
+                  Our Memory Lane
+                </h1>
+                <p className="text-sm text-[#C47D88] font-script mt-0.5 font-bold">
+                  Moments we cherish forever 💕
+                </p>
+              </div>
+
+              <button
+                onClick={() => setShowAddMemory(true)}
+                className="flex items-center gap-1.5 px-3.5 py-2 rounded-2xl text-xs font-semibold text-white shadow-md hover:shadow-lg hover:scale-105 active:scale-95 transition-all cursor-pointer shrink-0"
                 style={{
-                  fontFamily: `'${settings.heading_font || 'Playfair Display'}', serif`,
-                  color: settings.text_primary || '#44292E',
+                  background: 'linear-gradient(135deg, #E08594 0%, #C46D7D 100%)',
+                  boxShadow: '0 4px 14px rgba(196, 109, 125, 0.35)',
                 }}
               >
-                Our Memory Lane
-              </h1>
-              <p className="text-sm text-[#C47D88] font-script mt-0.5 font-bold">
-                Moments we cherish forever 💕
-              </p>
+                <Plus size={15} className="stroke-[2.5]" />
+                <span>Add Memory</span>
+                <span className="text-xs">📷</span>
+              </button>
             </header>
 
             <section>
-              <MemoryLane memories={memories} accentColor={settings.accent_color} />
+              <MemoryLane memories={memories} accentColor={settings.accent_color} onAddMemory={() => setShowAddMemory(true)} />
             </section>
           </motion.div>
         )}
+
+        {/* ─────────────────────────────────────────────────────────────
+            ADD MEMORY MODAL (For Jojo to add moments)
+           ───────────────────────────────────────────────────────────── */}
+        <AnimatePresence>
+          {showAddMemory && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 backdrop-blur-sm p-4 overflow-y-auto"
+              onClick={(e) => {
+                if (e.target === e.currentTarget && !isSavingMem && !isUploadingPhoto) {
+                  setShowAddMemory(false);
+                }
+              }}
+            >
+              <motion.div
+                initial={{ scale: 0.92, opacity: 0, y: 20 }}
+                animate={{ scale: 1, opacity: 1, y: 0 }}
+                exit={{ scale: 0.92, opacity: 0, y: 20 }}
+                transition={{ type: 'spring', damping: 25, stiffness: 320 }}
+                className="w-full max-w-md rounded-3xl p-5 sm:p-6 shadow-2xl relative my-auto"
+                style={{
+                  background: 'linear-gradient(165deg, #FFF7F8 0%, #FBEBED 100%)',
+                  border: '1.5px solid rgba(255, 255, 255, 0.95)',
+                  boxShadow: '0 20px 50px rgba(180, 110, 125, 0.25)',
+                }}
+              >
+                {/* Header */}
+                <div className="flex items-start justify-between mb-4">
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-xl">📸</span>
+                      <h3
+                        className="text-lg font-bold text-[#44292E]"
+                        style={{ fontFamily: `'${settings.heading_font || 'Playfair Display'}', serif` }}
+                      >
+                        Add to Our Memory Lane
+                      </h3>
+                    </div>
+                    <p className="text-xs text-[#8C6B72] mt-0.5">
+                      Save a moment with {settings.his_nickname || 'Bibo'} to our timeline 💕
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => setShowAddMemory(false)}
+                    disabled={isSavingMem || isUploadingPhoto}
+                    className="w-7 h-7 rounded-full bg-white/80 hover:bg-white text-gray-500 hover:text-gray-800 flex items-center justify-center text-sm shadow-xs transition-colors cursor-pointer"
+                  >
+                    <X size={14} />
+                  </button>
+                </div>
+
+                {/* Form */}
+                <form onSubmit={handleSaveMemory} className="space-y-3.5">
+                  {/* Memory Title */}
+                  <div>
+                    <label className="block text-[11px] font-semibold text-[#5D3A42] mb-1">
+                      Memory Title / عنوان الذكرى <span className="text-rose-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      value={memTitle}
+                      onChange={(e) => setMemTitle(e.target.value)}
+                      placeholder="e.g. Our First Trip Together 🌊, Movie Night..."
+                      dir="auto"
+                      required
+                      className="w-full px-3.5 py-2.5 rounded-2xl text-xs bg-white/90 border border-pink-200/80 outline-none text-[#44292E] placeholder:text-gray-400 focus:border-rose-400 focus:ring-2 focus:ring-rose-200 transition-all shadow-xs"
+                    />
+                  </div>
+
+                  {/* Date */}
+                  <div>
+                    <label className="block text-[11px] font-semibold text-[#5D3A42] mb-1">
+                      Date / تاريخ الذكرى
+                    </label>
+                    <input
+                      type="date"
+                      value={memDate}
+                      onChange={(e) => setMemDate(e.target.value)}
+                      className="w-full px-3.5 py-2.5 rounded-2xl text-xs bg-white/90 border border-pink-200/80 outline-none text-[#44292E] focus:border-rose-400 focus:ring-2 focus:ring-rose-200 transition-all shadow-xs cursor-pointer"
+                    />
+                  </div>
+
+                  {/* Photo Upload / Polaroid Preview */}
+                  <div>
+                    <label className="block text-[11px] font-semibold text-[#5D3A42] mb-1">
+                      Photo / صورة الذكرى <span className="text-gray-400 font-normal">(اختياري)</span>
+                    </label>
+
+                    <input
+                      type="file"
+                      ref={fileInputRef}
+                      accept="image/*"
+                      className="hidden"
+                      onChange={handlePhotoUpload}
+                    />
+
+                    {memImageUrl ? (
+                      /* Polaroid Preview */
+                      <div className="relative p-2.5 bg-white rounded-2xl shadow-sm border border-pink-100 flex items-center gap-3">
+                        <img
+                          src={memImageUrl}
+                          alt="Memory preview"
+                          className="w-20 h-20 object-cover rounded-xl shrink-0 border border-pink-50"
+                        />
+                        <div className="flex-1 min-w-0">
+                          <p className="text-[11px] font-medium text-emerald-700 flex items-center gap-1">
+                            <Check size={13} className="stroke-[2.5]" /> Photo attached!
+                          </p>
+                          <p className="text-[10px] text-gray-500 truncate mt-0.5">
+                            Ready to appear on your timeline
+                          </p>
+                          <div className="flex items-center gap-2 mt-2">
+                            <button
+                              type="button"
+                              onClick={() => fileInputRef.current?.click()}
+                              disabled={isUploadingPhoto}
+                              className="text-[10px] px-2.5 py-1 rounded-lg bg-pink-50 text-rose-700 hover:bg-pink-100 font-medium transition-colors cursor-pointer"
+                            >
+                              Change
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setMemImageUrl('')}
+                              className="text-[10px] px-2.5 py-1 rounded-lg bg-gray-50 text-gray-500 hover:bg-gray-100 transition-colors cursor-pointer"
+                            >
+                              Remove
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    ) : (
+                      /* Upload Button & Option */
+                      <div className="space-y-2">
+                        <button
+                          type="button"
+                          onClick={() => fileInputRef.current?.click()}
+                          disabled={isUploadingPhoto}
+                          className="w-full py-3.5 px-4 rounded-2xl border-2 border-dashed border-rose-200 hover:border-rose-400 bg-white/70 hover:bg-white flex flex-col items-center justify-center gap-1.5 transition-all text-[#6E424B] group cursor-pointer shadow-xs disabled:opacity-50"
+                        >
+                          {isUploadingPhoto ? (
+                            <div className="flex items-center gap-2 py-1">
+                              <RotateCw size={18} className="animate-spin text-rose-400" />
+                              <span className="text-xs font-medium text-rose-500">Uploading photo...</span>
+                            </div>
+                          ) : (
+                            <>
+                              <div className="w-9 h-9 rounded-full bg-rose-100/70 group-hover:bg-rose-100 flex items-center justify-center text-rose-500 transition-colors">
+                                <Upload size={16} />
+                              </div>
+                              <span className="text-xs font-semibold">Choose photo from phone or camera 📷</span>
+                              <span className="text-[10px] text-[#A07A82]">Tap to pick an image or selfie</span>
+                            </>
+                          )}
+                        </button>
+
+                        <div className="flex items-center justify-between text-[10px] px-1 text-[#8C6B72]">
+                          <span>Photo is optional</span>
+                          <button
+                            type="button"
+                            onClick={() => setShowUrlInput(!showUrlInput)}
+                            className="underline hover:text-rose-600 transition-colors cursor-pointer"
+                          >
+                            {showUrlInput ? 'Hide link option' : 'Or enter image link 🔗'}
+                          </button>
+                        </div>
+
+                        {showUrlInput && (
+                          <input
+                            type="url"
+                            value={memImageUrl}
+                            onChange={(e) => setMemImageUrl(e.target.value)}
+                            placeholder="https://example.com/photo.jpg"
+                            className="w-full px-3 py-2 rounded-xl text-xs bg-white/90 border border-pink-200 outline-none text-[#44292E] placeholder:text-gray-400 focus:border-rose-400"
+                          />
+                        )}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Caption */}
+                  <div>
+                    <label className="block text-[11px] font-semibold text-[#5D3A42] mb-1">
+                      Sweet Note / تفاصيل أو كلمة حلوة <span className="text-gray-400 font-normal">(اختياري)</span>
+                    </label>
+                    <textarea
+                      value={memCaption}
+                      onChange={(e) => setMemCaption(e.target.value)}
+                      placeholder="Write what made this moment unforgettable..."
+                      dir="auto"
+                      rows={3}
+                      className="w-full px-3.5 py-2.5 rounded-2xl text-xs bg-white/90 border border-pink-200/80 outline-none text-[#44292E] placeholder:text-gray-400 focus:border-rose-400 focus:ring-2 focus:ring-rose-200 transition-all resize-none shadow-xs"
+                    />
+                  </div>
+
+                  {/* Feedback Message */}
+                  {memSaveSuccess && (
+                    <motion.div
+                      initial={{ opacity: 0, y: -5 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      className="p-3 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-medium flex items-center justify-center gap-2"
+                    >
+                      <span>✨</span>
+                      <span>Saved to our Memory Lane! {settings.his_nickname || 'Bibo'} can see it too 💕</span>
+                    </motion.div>
+                  )}
+
+                  {/* Buttons */}
+                  <div className="flex items-center gap-2 pt-1">
+                    <button
+                      type="button"
+                      onClick={() => setShowAddMemory(false)}
+                      disabled={isSavingMem || isUploadingPhoto}
+                      className="flex-1 py-2.5 px-4 rounded-2xl text-xs font-medium text-[#7A5B61] bg-white/70 hover:bg-white border border-pink-200/60 transition-all cursor-pointer disabled:opacity-50"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={!memTitle.trim() || isSavingMem || isUploadingPhoto}
+                      className="flex-1 py-2.5 px-4 rounded-2xl text-xs font-semibold text-white shadow-md hover:shadow-lg active:scale-98 transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-1.5"
+                      style={{
+                        background: 'linear-gradient(135deg, #E08594 0%, #C46D7D 100%)',
+                      }}
+                    >
+                      {isSavingMem ? (
+                        <>
+                          <RotateCw size={13} className="animate-spin" />
+                          <span>Saving...</span>
+                        </>
+                      ) : (
+                        <>
+                          <span>Save Memory</span>
+                          <Sparkles size={13} />
+                        </>
+                      )}
+                    </button>
+                  </div>
+                </form>
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
 
         {/* ─────────────────────────────────────────────────────────────
             TAB 5: PING MODAL

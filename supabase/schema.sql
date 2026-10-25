@@ -98,10 +98,15 @@ create table if not exists public.memories (
   title text not null,
   memory_date date not null,
   caption text,
-  image_url text not null,
+  image_url text default '',
   sort_order integer not null default 0,
   created_at timestamptz not null default now()
 );
+
+-- Idempotent column alterations for existing memories table
+alter table public.memories alter column image_url drop not null;
+alter table public.memories alter column image_url set default '';
+
 
 -- -------------------------------------------------------------------------
 -- 6. SIGNALS / REACTIONS FROM JOJO TO BIBO
