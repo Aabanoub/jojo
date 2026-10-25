@@ -18,7 +18,6 @@ export default function JojoPage() {
   const { state, sendSignal } = usePortal();
   const { settings, events, envelopes, tracks, memories } = state;
   const [activeTab, setActiveTab] = useState<TabId>('home');
-  const [envelopeViewMode, setEnvelopeViewMode] = useState<'grid' | 'expanded'>('grid');
   const [showTogetherDetail, setShowTogetherDetail] = useState(false);
   const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
   const [pingMessage, setPingMessage] = useState('');
@@ -435,76 +434,35 @@ export default function JojoPage() {
             exit={{ opacity: 0 }}
             className="space-y-4"
           >
-            <header className="pt-1 flex items-center justify-between">
-              <div>
-                <h1
-                  className="text-2xl font-bold tracking-tight"
-                  style={{
-                    fontFamily: `'${settings.heading_font || 'Playfair Display'}', serif`,
-                    color: settings.text_primary || '#44292E',
-                  }}
-                >
-                  Open When Envelopes
-                </h1>
-                <p className="text-sm text-[#C47D88] font-script mt-0.5 font-bold">
-                  For {settings.her_nickname || 'Jojo'} 💕
-                </p>
-              </div>
-
-              {envelopes.length > 0 && (
-                <div className="flex items-center gap-1 bg-white/60 p-1 rounded-full border border-white/80 shadow-xs">
-                  <button
-                    onClick={() => setEnvelopeViewMode('grid')}
-                    className={`px-2.5 py-1 rounded-full text-[10px] font-semibold transition-all cursor-pointer ${
-                      envelopeViewMode === 'grid'
-                        ? 'bg-white text-[#44292E] shadow-xs'
-                        : 'text-[#7A5B61] hover:text-[#44292E]'
-                    }`}
-                  >
-                    Grid ⊞
-                  </button>
-                  <button
-                    onClick={() => setEnvelopeViewMode('expanded')}
-                    className={`px-2.5 py-1 rounded-full text-[10px] font-semibold transition-all cursor-pointer ${
-                      envelopeViewMode === 'expanded'
-                        ? 'bg-white text-[#44292E] shadow-xs'
-                        : 'text-[#7A5B61] hover:text-[#44292E]'
-                    }`}
-                  >
-                    Full 📜
-                  </button>
-                </div>
-              )}
+            <header className="pt-1">
+              <h1
+                className="text-2xl font-bold tracking-tight"
+                style={{
+                  fontFamily: `'${settings.heading_font || 'Playfair Display'}', serif`,
+                  color: settings.text_primary || '#44292E',
+                }}
+              >
+                Open When Envelopes
+              </h1>
+              <p className="text-sm text-[#C47D88] font-script mt-0.5 font-bold">
+                For {settings.her_nickname || 'Jojo'} 💕
+              </p>
             </header>
 
-            {/* Envelopes list / grid */}
+            {/* Envelopes 2-column Grid */}
             <section className="space-y-3">
               {envelopes.length > 0 ? (
-                envelopeViewMode === 'grid' ? (
-                  <div className="grid grid-cols-2 gap-3">
-                    {envelopes.map((env) => (
-                      <EnvelopeCard
-                        key={env.id}
-                        envelope={env}
-                        accentColor={settings.accent_color}
-                        masterPassword={settings.master_password}
-                        compact={true}
-                      />
-                    ))}
-                  </div>
-                ) : (
-                  <div className="space-y-3">
-                    {envelopes.map((env) => (
-                      <EnvelopeCard
-                        key={env.id}
-                        envelope={env}
-                        accentColor={settings.accent_color}
-                        masterPassword={settings.master_password}
-                        compact={false}
-                      />
-                    ))}
-                  </div>
-                )
+                <div className="grid grid-cols-2 gap-3">
+                  {envelopes.map((env) => (
+                    <EnvelopeCard
+                      key={env.id}
+                      envelope={env}
+                      accentColor={settings.accent_color}
+                      masterPassword={settings.master_password}
+                      compact={true}
+                    />
+                  ))}
+                </div>
               ) : (
                 <div
                   className="rounded-3xl p-8 text-center shadow-sm"
