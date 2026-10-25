@@ -27,7 +27,7 @@ interface PortalContextType {
   deleteEnvelope: (id: string) => Promise<void>;
   upsertTrack: (track: PlaylistTrack) => Promise<void>;
   deleteTrack: (id: string) => Promise<void>;
-  upsertMemory: (memory: Memory) => Promise<void>;
+  upsertMemory: (memory: Memory) => Promise<{ success: boolean; error?: string }>;
   deleteMemory: (id: string) => Promise<void>;
   sendSignal: (signal: Omit<JojoSignal, 'id' | 'created_at' | 'is_read'>) => Promise<void>;
   markSignalRead: (id: string) => Promise<void>;
@@ -501,7 +501,7 @@ export function PortalProvider({ children }: { children: React.ReactNode }) {
     }
   }, [client, broadcast]);
 
-  const upsertMemory = useCallback(async (memory: Memory) => {
+  const upsertMemory = useCallback(async (memory: Memory): Promise<{ success: boolean; error?: string }> => {
     setState(prev => {
       const idx = prev.memories.findIndex(m => m.id === memory.id);
       const memories = [...prev.memories];
@@ -514,11 +514,18 @@ export function PortalProvider({ children }: { children: React.ReactNode }) {
     if (client) {
       try {
         const { error } = await client.from('memories').upsert(memory);
-        if (error) console.error('Supabase upsertMemory error:', error.message);
+        if (error) {
+          console.error('Supabase upsertMemory error:', error.message);
+          setCloudStatus(prev => ({ ...prev, error: error.message }));
+          return { success: false, error: error.message };
+        }
+        return { success: true };
       } catch (err: any) {
         console.error('Supabase upsertMemory error:', err);
+        return { success: false, error: err?.message || 'Network error' };
       }
     }
+    return { success: true };
   }, [client, broadcast]);
 
   const deleteMemory = useCallback(async (id: string) => {

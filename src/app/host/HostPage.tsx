@@ -10,8 +10,8 @@ import {
   Sparkles, Star, Camera,
 } from 'lucide-react';
 import { usePortal } from '@/lib/PortalProvider';
-import { uploadFile, BUCKETS, isSupabaseConfigured, getSupabaseCredentials } from '@/lib/supabase';
-import type { EventVault, OpenWhenEnvelope, PlaylistTrack, Memory } from '@/lib/types';
+import { uploadFile, uploadFileDetailed, BUCKETS, isSupabaseConfigured, getSupabaseCredentials, compressImage } from '@/lib/supabase';
+import { generateUUID, type EventVault, type OpenWhenEnvelope, type PlaylistTrack, type Memory } from '@/lib/types';
 import ClientDate from '@/components/ClientDate';
 
 type NavTab = 'dashboard' | 'theme' | 'events' | 'media' | 'music' | 'settings';
@@ -330,12 +330,17 @@ export default function HostPage() {
     const mem: Memory = editMemId
       ? { ...(memories.find(m => m.id === editMemId)!), ...memForm }
       : {
-          id: `mem-${Date.now()}`,
+          id: generateUUID(),
           ...memForm,
           sort_order: memories.length + 1,
           created_at: new Date().toISOString(),
         };
-    await doSave('memory', () => upsertMemory(mem));
+    await doSave('memory', async () => {
+      const res = await upsertMemory(mem);
+      if (res && !res.success && res.error) {
+        alert(`Could not save memory to Supabase: ${res.error}\n\nPlease check memories table in Supabase.`);
+      }
+    });
     setMemForm({ title: '', memory_date: '', caption: '', image_url: '' });
     setEditMemId(null);
   };
@@ -352,23 +357,22 @@ export default function HostPage() {
     }
   };
 
-
-
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+    const rawFile = e.target.files?.[0];
+    if (!rawFile) return;
 
     setIsUploading(true);
     try {
+      const file = await compressImage(rawFile);
       let url = '';
       if (isSupabaseConfigured) {
         const ext = file.name.split('.').pop() || 'jpg';
         const cleanName = `${Date.now()}-${Math.random().toString(36).substring(2, 7)}.${ext}`;
-        const uploadedUrl = await uploadFile(BUCKETS.MEMORIES, cleanName, file);
-        if (uploadedUrl) {
-          url = uploadedUrl;
-        } else {
-          console.warn('Supabase storage upload returned null, using local fallback.');
+        const uploadRes = await uploadFileDetailed(BUCKETS.MEMORIES, cleanName, file);
+        if (uploadRes.url) {
+          url = uploadRes.url;
+        } else if (uploadRes.error) {
+          console.warn('Supabase storage upload error:', uploadRes.error);
         }
       }
 
@@ -381,13 +385,15 @@ export default function HostPage() {
         });
       }
 
-      const newAsset = {
-        id: `ast-${Date.now()}`,
-        name: file.name,
-        url,
-        created_at: new Date().toISOString(),
-      };
-      await upsertAsset(newAsset);
+      if (url.startsWith('http')) {
+        const newAsset = {
+          id: generateUUID(),
+          name: file.name,
+          url,
+          created_at: new Date().toISOString(),
+        };
+        await upsertAsset(newAsset);
+      }
       setMemForm(f => ({ ...f, image_url: url }));
     } catch (err) {
       console.error('File upload failed:', err);

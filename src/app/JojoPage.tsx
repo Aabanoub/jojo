@@ -7,8 +7,8 @@ import {
   Plus, Upload, RotateCw, Check, X,
 } from 'lucide-react';
 import { usePortal } from '@/lib/PortalProvider';
-import { uploadFile, BUCKETS, isSupabaseConfigured } from '@/lib/supabase';
-import type { Memory } from '@/lib/types';
+import { uploadFileDetailed, BUCKETS, isSupabaseConfigured, compressImage } from '@/lib/supabase';
+import { generateUUID, type Memory } from '@/lib/types';
 import ParticleBackground from '@/components/ParticleBackground';
 import MusicPlayer from '@/components/MusicPlayer';
 import CountdownDisplay from '@/components/CountdownDisplay';
@@ -86,18 +86,23 @@ export default function JojoPage() {
   };
 
   const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+    const rawFile = e.target.files?.[0];
+    if (!rawFile) return;
 
     setIsUploadingPhoto(true);
     try {
+      // Compress large mobile photos for fast and safe upload
+      const file = await compressImage(rawFile);
       let url = '';
+
       if (isSupabaseConfigured) {
         const ext = file.name.split('.').pop() || 'jpg';
         const cleanName = `${Date.now()}-${Math.random().toString(36).substring(2, 7)}.${ext}`;
-        const uploadedUrl = await uploadFile(BUCKETS.MEMORIES, cleanName, file);
-        if (uploadedUrl) {
-          url = uploadedUrl;
+        const uploadRes = await uploadFileDetailed(BUCKETS.MEMORIES, cleanName, file);
+        if (uploadRes.url) {
+          url = uploadRes.url;
+        } else if (uploadRes.error) {
+          console.warn('Supabase storage upload returned error:', uploadRes.error);
         }
       }
 
@@ -110,17 +115,19 @@ export default function JojoPage() {
         });
       }
 
-      await upsertAsset({
-        id: `ast-${Date.now()}`,
-        name: file.name,
-        url,
-        created_at: new Date().toISOString(),
-      });
+      if (url.startsWith('http')) {
+        await upsertAsset({
+          id: generateUUID(),
+          name: file.name,
+          url,
+          created_at: new Date().toISOString(),
+        });
+      }
 
       setMemImageUrl(url);
-    } catch (err) {
+    } catch (err: any) {
       console.error('Photo upload failed:', err);
-      alert('Photo upload failed. Please try again or paste a link.');
+      alert(`Photo upload failed: ${err?.message || err}. Please try again or paste a link.`);
     } finally {
       setIsUploadingPhoto(false);
       if (e.target) e.target.value = '';
@@ -134,7 +141,7 @@ export default function JojoPage() {
     setIsSavingMem(true);
     try {
       const newMemory: Memory = {
-        id: `mem-${Date.now()}`,
+        id: generateUUID(),
         title: memTitle.trim(),
         memory_date: memDate || new Date().toISOString().split('T')[0],
         caption: memCaption.trim() || null,
@@ -143,7 +150,12 @@ export default function JojoPage() {
         created_at: new Date().toISOString(),
       };
 
-      await upsertMemory(newMemory);
+      const res = await upsertMemory(newMemory);
+      if (res && !res.success && res.error) {
+        alert(`Could not save memory to Supabase: ${res.error}\n\nPlease make sure memories table permissions are updated in Supabase SQL editor.`);
+        setIsSavingMem(false);
+        return;
+      }
 
       // Notify Bibo live
       await sendSignal({
@@ -161,9 +173,9 @@ export default function JojoPage() {
         setShowUrlInput(false);
         setMemDate(new Date().toISOString().split('T')[0]);
       }, 1200);
-    } catch (err) {
+    } catch (err: any) {
       console.error('Failed to save memory:', err);
-      alert('Could not save memory. Please check your connection.');
+      alert(`Could not save memory: ${err?.message || err}`);
     } finally {
       setIsSavingMem(false);
     }

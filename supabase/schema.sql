@@ -129,6 +129,10 @@ create table if not exists public.uploaded_assets (
   created_at timestamptz not null default now()
 );
 
+-- Drop unique constraint on url to support large or duplicate asset uploads safely
+alter table public.uploaded_assets drop constraint if exists uploaded_assets_url_key;
+
+
 -- -------------------------------------------------------------------------
 -- 8. ROW LEVEL SECURITY (RLS) POLICIES
 -- -------------------------------------------------------------------------

@@ -85,21 +85,35 @@ export const BUCKETS = {
   MEMORIES: 'memories',
 } as const;
 
+export interface UploadResult {
+  url: string | null;
+  error?: string;
+}
+
+export async function uploadFileDetailed(
+  bucket: string,
+  path: string,
+  file: File
+): Promise<UploadResult> {
+  if (!supabase) return { url: null, error: 'Database is not connected on this device' };
+  const { error } = await supabase.storage.from(bucket).upload(path, file, {
+    upsert: true,
+  });
+  if (error) {
+    console.error(`Upload error in bucket "${bucket}":`, error.message);
+    return { url: null, error: error.message };
+  }
+  const { data } = supabase.storage.from(bucket).getPublicUrl(path);
+  return { url: data.publicUrl };
+}
+
 export async function uploadFile(
   bucket: string,
   path: string,
   file: File
 ): Promise<string | null> {
-  if (!supabase) return null;
-  const { error } = await supabase.storage.from(bucket).upload(path, file, {
-    upsert: true,
-  });
-  if (error) {
-    console.error('Upload error:', error);
-    return null;
-  }
-  const { data } = supabase.storage.from(bucket).getPublicUrl(path);
-  return data.publicUrl;
+  const res = await uploadFileDetailed(bucket, path, file);
+  return res.url;
 }
 
 export async function getPublicUrl(
@@ -109,4 +123,50 @@ export async function getPublicUrl(
   if (!supabase) return '';
   const { data } = supabase.storage.from(bucket).getPublicUrl(path);
   return data.publicUrl;
+}
+
+export async function compressImage(file: File, maxWidth = 1600, quality = 0.8): Promise<File> {
+  if (typeof window === 'undefined') return file;
+  if (!file.type.startsWith('image/') || file.type === 'image/svg+xml' || file.size < 250 * 1024) {
+    return file;
+  }
+  return new Promise((resolve) => {
+    const img = new Image();
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      img.src = e.target?.result as string;
+    };
+    img.onload = () => {
+      let { width, height } = img;
+      if (width > maxWidth || height > maxWidth) {
+        if (width > height) {
+          height = Math.round((height * maxWidth) / width);
+          width = maxWidth;
+        } else {
+          width = Math.round((width * maxWidth) / height);
+          height = maxWidth;
+        }
+      }
+      const canvas = document.createElement('canvas');
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return resolve(file);
+      ctx.drawImage(img, 0, 0, width, height);
+      canvas.toBlob(
+        (blob) => {
+          if (!blob || blob.size >= file.size) return resolve(file);
+          const compressed = new File([blob], file.name.replace(/\.[^/.]+$/, '') + '.jpg', {
+            type: 'image/jpeg',
+            lastModified: Date.now(),
+          });
+          resolve(compressed);
+        },
+        'image/jpeg',
+        quality
+      );
+    };
+    img.onerror = () => resolve(file);
+    reader.readAsDataURL(file);
+  });
 }
