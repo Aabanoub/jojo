@@ -11,15 +11,9 @@ export default function MusicPlayer({ tracks, accentColor }: { tracks: PlaylistT
   const [isRepeat, setIsRepeat] = useState(false);
   const audioRef = useRef<HTMLAudioElement>(null);
 
-  const currentTrack = tracks[currentIndex] || {
-    id: 'default-track',
-    title: 'Our Song — Bibo & Jojo',
-    artist: 'Bibo & Jojo',
-    audio_url: 'https://actions.google.com/sounds/v1/ambiences/gentle_acoustic_guitar.ogg',
-    cover_url: '/images/couple_portrait.jpg',
-    sort_order: 1,
-    created_at: new Date().toISOString(),
-  };
+  if (!tracks || tracks.length === 0) return null;
+
+  const currentTrack = tracks[currentIndex] || tracks[0];
 
   useEffect(() => {
     if (audioRef.current) {
@@ -67,12 +61,16 @@ export default function MusicPlayer({ tracks, accentColor }: { tracks: PlaylistT
         }}
       >
         {/* Album thumbnail */}
-        <div className="w-9 h-9 rounded-xl overflow-hidden shrink-0 shadow-sm border border-white/60 bg-pink-100">
-          <img
-            src={currentTrack.cover_url || '/images/couple_portrait.jpg'}
-            alt="Song cover"
-            className="w-full h-full object-cover"
-          />
+        <div className="w-9 h-9 rounded-xl overflow-hidden shrink-0 shadow-sm border border-white/60 bg-gradient-to-br from-pink-200 to-rose-300 flex items-center justify-center text-xs">
+          {currentTrack.cover_url ? (
+            <img
+              src={currentTrack.cover_url}
+              alt="Song cover"
+              className="w-full h-full object-cover"
+            />
+          ) : (
+            <span>🎵</span>
+          )}
         </div>
 
         {/* Info & controls */}

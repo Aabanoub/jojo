@@ -19,33 +19,20 @@ export default function JojoPage() {
   const { settings, events, envelopes, tracks, memories } = state;
   const [activeTab, setActiveTab] = useState<TabId>('home');
   const [showTogetherDetail, setShowTogetherDetail] = useState(false);
-  const [selectedEventIdx, setSelectedEventIdx] = useState(0);
+  const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
   const [pingMessage, setPingMessage] = useState('');
   const [showPingSuccess, setShowPingSuccess] = useState(false);
   const [togetherStr, setTogetherStr] = useState('');
 
   // Find featured event or fallback to first
-  const featuredEvent = events.find(e => e.is_featured) || events[0];
-  const selectedEvent = events[selectedEventIdx] || featuredEvent || {
-    id: 'evt-default',
-    title: "Valentine's Day Surprise ❤️",
-    subtitle: 'Special Surprise from Bibo to Jojo',
-    target_date: '2027-02-14T00:00:00+02:00',
-    is_featured: true,
-    unlock_method: 'scratch' as const,
-    event_password: settings.master_password,
-    force_unlocked: false,
-    teaser_clue: 'Something special from Bibo is waiting for you inside...',
-    vault_letter: '',
-    vault_media: [],
-    created_at: new Date().toISOString(),
-  };
+  const featuredEvent = events.find(e => e.is_featured) || events[0] || null;
+  const selectedEvent = (selectedEventId ? events.find(e => e.id === selectedEventId) : null) || featuredEvent || null;
 
   // Format relationship start date dynamically
   const startDate = new Date(settings.relationship_start);
-  const formattedTogetherDate = !isNaN(startDate.getTime())
+  const formattedTogetherDate = settings.relationship_start && !isNaN(startDate.getTime())
     ? `${String(startDate.getDate()).padStart(2, '0')}·${String(startDate.getMonth() + 1).padStart(2, '0')}·${startDate.getFullYear()}`
-    : '15·09·2025';
+    : '';
 
   // Live together-since counter
   useEffect(() => {
@@ -120,23 +107,25 @@ export default function JojoPage() {
               >
                 {settings.portal_title || `${settings.his_nickname || 'Bibo'} & ${settings.her_nickname || 'Jojo'}`} <span className="text-amber-400 text-lg">✨</span>
               </h1>
-              <button
-                onClick={() => setShowTogetherDetail(!showTogetherDetail)}
-                className="mt-1.5 inline-flex items-center gap-1.5 text-[11px] px-3 py-1 rounded-full shadow-xs transition-all cursor-pointer"
-                style={{
-                  background: 'rgba(255, 255, 255, 0.65)',
-                  border: '1px solid rgba(255, 255, 255, 0.8)',
-                  color: settings.text_primary || '#6E454E',
-                }}
-              >
-                <Clock size={11} className="text-[#C47D88]" />
-                Together Since {formattedTogetherDate}
-                <ChevronDown
-                  size={11}
-                  className="transition-transform"
-                  style={{ transform: showTogetherDetail ? 'rotate(180deg)' : 'rotate(0)' }}
-                />
-              </button>
+              {formattedTogetherDate && (
+                <button
+                  onClick={() => setShowTogetherDetail(!showTogetherDetail)}
+                  className="mt-1.5 inline-flex items-center gap-1.5 text-[11px] px-3 py-1 rounded-full shadow-xs transition-all cursor-pointer"
+                  style={{
+                    background: 'rgba(255, 255, 255, 0.65)',
+                    border: '1px solid rgba(255, 255, 255, 0.8)',
+                    color: settings.text_primary || '#6E454E',
+                  }}
+                >
+                  <Clock size={11} className="text-[#C47D88]" />
+                  Together Since {formattedTogetherDate}
+                  <ChevronDown
+                    size={11}
+                    className="transition-transform"
+                    style={{ transform: showTogetherDetail ? 'rotate(180deg)' : 'rotate(0)' }}
+                  />
+                </button>
+              )}
 
               <AnimatePresence>
                 {showTogetherDetail && (
@@ -160,7 +149,7 @@ export default function JojoPage() {
               </AnimatePresence>
             </header>
 
-            {/* Card 1: Daily Note from Bibo */}
+            {/* Card 1: Daily Note */}
             <section
               className="rounded-3xl p-4 shadow-sm"
               style={{
@@ -174,63 +163,87 @@ export default function JojoPage() {
                   className="text-xs font-semibold"
                   style={{ color: settings.text_primary || '#44292E' }}
                 >
-                  {settings.daily_note_title || `Daily Note from ${settings.his_nickname || 'Bibo'} 💌 :`}
+                  {settings.daily_note_title || `Daily Note 💌 :`}
                 </span>
-                <ClientDate
-                  date={settings.daily_note_updated_at}
-                  className="text-[9px] text-[#7A5B61] opacity-60"
-                />
+                {settings.daily_note_updated_at && (
+                  <ClientDate
+                    date={settings.daily_note_updated_at}
+                    className="text-[9px] text-[#7A5B61] opacity-60"
+                  />
+                )}
               </div>
               <p
                 className="text-sm md:text-base leading-relaxed font-script"
                 style={{ color: settings.text_primary || '#44292E' }}
                 dir="auto"
               >
-                {settings.daily_note_content}
+                {settings.daily_note_content || `No note for today yet. Check back soon! 💕`}
               </p>
             </section>
 
             {/* Card 2: Hero Countdown */}
-            <section
-              className="rounded-3xl p-4 md:p-5 shadow-sm glow-card relative overflow-hidden"
-              style={{
-                background: 'rgba(255, 255, 255, 0.55)',
-                backdropFilter: 'blur(16px)',
-                border: '1.5px solid rgba(240, 205, 175, 0.75)',
-              }}
-            >
-              <CountdownDisplay
-                targetDate={selectedEvent.target_date}
-                label={selectedEvent.title}
-                accentColor={settings.accent_color}
-                switcher={
-                  events.length > 1 ? (
-                    <div className="flex gap-1.5 flex-wrap justify-center">
-                      {events.map((evt, idx) => (
-                        <button
-                          key={evt.id}
-                          onClick={() => setSelectedEventIdx(idx)}
-                          className="text-[10px] px-3 py-1 rounded-full transition-all shadow-xs cursor-pointer"
-                          style={{
-                            background: idx === selectedEventIdx ? 'rgba(255, 255, 255, 0.95)' : 'rgba(255, 255, 255, 0.4)',
-                            color: idx === selectedEventIdx ? '#44292E' : '#7A5B61',
-                            border: '1px solid rgba(255, 255, 255, 0.7)',
-                            fontWeight: idx === selectedEventIdx ? 600 : 500,
-                          }}
-                        >
-                          {evt.title}
-                        </button>
-                      ))}
-                    </div>
-                  ) : null
-                }
-              />
-            </section>
+            {selectedEvent ? (
+              <section
+                className="rounded-3xl p-4 md:p-5 shadow-sm glow-card relative overflow-hidden"
+                style={{
+                  background: 'rgba(255, 255, 255, 0.55)',
+                  backdropFilter: 'blur(16px)',
+                  border: '1.5px solid rgba(240, 205, 175, 0.75)',
+                }}
+              >
+                <CountdownDisplay
+                  targetDate={selectedEvent.target_date}
+                  label={selectedEvent.title}
+                  accentColor={settings.accent_color}
+                  switcher={
+                    events.length > 1 ? (
+                      <div className="flex gap-1.5 flex-wrap justify-center">
+                        {events.map((evt) => (
+                          <button
+                            key={evt.id}
+                            onClick={() => setSelectedEventId(evt.id)}
+                            className="text-[10px] px-3 py-1 rounded-full transition-all shadow-xs cursor-pointer flex items-center gap-1"
+                            style={{
+                              background: evt.id === selectedEvent.id ? 'rgba(255, 255, 255, 0.95)' : 'rgba(255, 255, 255, 0.4)',
+                              color: evt.id === selectedEvent.id ? '#44292E' : '#7A5B61',
+                              border: '1px solid rgba(255, 255, 255, 0.7)',
+                              fontWeight: evt.id === selectedEvent.id ? 600 : 500,
+                            }}
+                          >
+                            {evt.is_featured && <span>⭐</span>}
+                            <span>{evt.title}</span>
+                          </button>
+                        ))}
+                      </div>
+                    ) : null
+                  }
+                />
+              </section>
+            ) : (
+              <section
+                className="rounded-3xl p-6 text-center shadow-sm"
+                style={{
+                  background: 'rgba(255, 255, 255, 0.45)',
+                  backdropFilter: 'blur(16px)',
+                  border: '1px dashed rgba(240, 205, 175, 0.8)',
+                }}
+              >
+                <div className="w-10 h-10 rounded-full mx-auto mb-2 flex items-center justify-center bg-white/70 text-lg shadow-xs">
+                  ⏳
+                </div>
+                <h3 className="text-sm font-semibold text-[#44292E]">No Upcoming Events Yet</h3>
+                <p className="text-xs text-[#7A5B61] mt-1">
+                  Add an upcoming milestone or surprise event in the Host Studio.
+                </p>
+              </section>
+            )}
 
             {/* Card 3: Digital Vault */}
-            <section>
-              <VaultCard event={selectedEvent} accentColor={settings.accent_color} />
-            </section>
+            {selectedEvent && (
+              <section>
+                <VaultCard event={selectedEvent} accentColor={settings.accent_color} />
+              </section>
+            )}
 
             {/* Card 4: Open When Envelopes in Grid */}
             <section className="space-y-2 pt-1">
@@ -244,23 +257,35 @@ export default function JojoPage() {
                 {envelopes.length > 2 && (
                   <button
                     onClick={() => setActiveTab('envelopes')}
-                    className="text-[10px] text-[#C47D88] hover:underline font-medium"
+                    className="text-[10px] text-[#C47D88] hover:underline font-medium cursor-pointer"
                   >
                     View All ({envelopes.length}) →
                   </button>
                 )}
               </div>
-              <div className="grid grid-cols-2 gap-3">
-                {envelopes.slice(0, 4).map((env) => (
-                  <EnvelopeCard
-                    key={env.id}
-                    envelope={env}
-                    accentColor={settings.accent_color}
-                    masterPassword={settings.master_password}
-                    compact={true}
-                  />
-                ))}
-              </div>
+              {envelopes.length > 0 ? (
+                <div className="grid grid-cols-2 gap-3">
+                  {envelopes.slice(0, 4).map((env) => (
+                    <EnvelopeCard
+                      key={env.id}
+                      envelope={env}
+                      accentColor={settings.accent_color}
+                      masterPassword={settings.master_password}
+                      compact={true}
+                    />
+                  ))}
+                </div>
+              ) : (
+                <div
+                  className="rounded-2xl p-5 text-center shadow-xs"
+                  style={{
+                    background: 'rgba(255, 255, 255, 0.45)',
+                    border: '1px dashed rgba(255, 255, 255, 0.7)',
+                  }}
+                >
+                  <p className="text-xs text-[#7A5B61]">No envelopes created yet. Add one in the Host Studio!</p>
+                </div>
+              )}
             </section>
           </motion.div>
         )}
@@ -290,47 +315,69 @@ export default function JojoPage() {
               </p>
             </header>
 
-            {/* Event Countdown Card */}
-            <section
-              className="rounded-3xl p-4 shadow-sm"
-              style={{
-                background: 'rgba(255, 255, 255, 0.55)',
-                backdropFilter: 'blur(16px)',
-                border: '1.5px solid rgba(240, 205, 175, 0.75)',
-              }}
-            >
-              <CountdownDisplay
-                targetDate={selectedEvent.target_date}
-                label={selectedEvent.title}
-                accentColor={settings.accent_color}
-                switcher={
-                  events.length > 1 ? (
-                    <div className="flex gap-1.5 flex-wrap justify-center mt-2">
-                      {events.map((evt, idx) => (
-                        <button
-                          key={evt.id}
-                          onClick={() => setSelectedEventIdx(idx)}
-                          className="text-[10px] px-3 py-1 rounded-full transition-all shadow-xs cursor-pointer"
-                          style={{
-                            background: idx === selectedEventIdx ? 'rgba(255, 255, 255, 0.95)' : 'rgba(255, 255, 255, 0.4)',
-                            color: idx === selectedEventIdx ? '#44292E' : '#7A5B61',
-                            border: '1px solid rgba(255, 255, 255, 0.7)',
-                            fontWeight: idx === selectedEventIdx ? 600 : 500,
-                          }}
-                        >
-                          {evt.title}
-                        </button>
-                      ))}
-                    </div>
-                  ) : null
-                }
-              />
-            </section>
+            {/* Event Countdown Card & Vault Card */}
+            {selectedEvent ? (
+              <>
+                <section
+                  className="rounded-3xl p-4 shadow-sm"
+                  style={{
+                    background: 'rgba(255, 255, 255, 0.55)',
+                    backdropFilter: 'blur(16px)',
+                    border: '1.5px solid rgba(240, 205, 175, 0.75)',
+                  }}
+                >
+                  <CountdownDisplay
+                    targetDate={selectedEvent.target_date}
+                    label={selectedEvent.title}
+                    accentColor={settings.accent_color}
+                    switcher={
+                      events.length > 1 ? (
+                        <div className="flex gap-1.5 flex-wrap justify-center mt-2">
+                          {events.map((evt) => (
+                            <button
+                              key={evt.id}
+                              onClick={() => setSelectedEventId(evt.id)}
+                              className="text-[10px] px-3 py-1 rounded-full transition-all shadow-xs cursor-pointer flex items-center gap-1"
+                              style={{
+                                background: evt.id === selectedEvent.id ? 'rgba(255, 255, 255, 0.95)' : 'rgba(255, 255, 255, 0.4)',
+                                color: evt.id === selectedEvent.id ? '#44292E' : '#7A5B61',
+                                border: '1px solid rgba(255, 255, 255, 0.7)',
+                                fontWeight: evt.id === selectedEvent.id ? 600 : 500,
+                              }}
+                            >
+                              {evt.is_featured && <span>⭐</span>}
+                              <span>{evt.title}</span>
+                            </button>
+                          ))}
+                        </div>
+                      ) : null
+                    }
+                  />
+                </section>
 
-            {/* Vault Content Card */}
-            <section>
-              <VaultCard event={selectedEvent} accentColor={settings.accent_color} />
-            </section>
+                {/* Vault Content Card */}
+                <section>
+                  <VaultCard event={selectedEvent} accentColor={settings.accent_color} />
+                </section>
+              </>
+            ) : (
+              <section
+                className="rounded-3xl p-8 text-center shadow-sm"
+                style={{
+                  background: 'rgba(255, 255, 255, 0.45)',
+                  backdropFilter: 'blur(16px)',
+                  border: '1px dashed rgba(240, 205, 175, 0.8)',
+                }}
+              >
+                <div className="w-12 h-12 rounded-full mx-auto mb-3 flex items-center justify-center bg-white/70 text-2xl shadow-xs">
+                  🔒
+                </div>
+                <h3 className="text-sm font-semibold text-[#44292E]">No Vault Milestones Yet</h3>
+                <p className="text-xs text-[#7A5B61] mt-1 max-w-xs mx-auto">
+                  When you add an event in Host Studio with a secret letter or photos, it will appear locked here until the countdown completes or is unlocked.
+                </p>
+              </section>
+            )}
           </motion.div>
         )}
 

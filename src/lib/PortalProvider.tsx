@@ -48,20 +48,46 @@ export function usePortal() {
 }
 
 // ── LocalStorage Helpers ────────────────────────────────────────────────────
+const LEGACY_SEED_IDS = new Set([
+  'evt-valentine-2027',
+  'evt-birthday-jojo',
+  'env-miss-bibo',
+  'env-need-smile',
+  'env-cant-sleep',
+  'track-our-song',
+  'mem-1',
+  'mem-2',
+  'ast-1',
+  'ast-2',
+  'ast-3',
+  'ast-4',
+  'sig-1',
+  'evt-default',
+]);
+
+function filterLegacy<T extends { id?: string }>(items: any): T[] {
+  if (!Array.isArray(items)) return [];
+  return items.filter(i => !i?.id || !LEGACY_SEED_IDS.has(i.id));
+}
+
 function loadLocal(): PortalState {
   if (typeof window === 'undefined') return DEFAULT_STATE;
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (raw) {
       const parsed = JSON.parse(raw);
+      const settings = { ...DEFAULT_STATE.settings, ...(parsed.settings || {}) };
+      if (settings.daily_note_content === 'Good luck today my Jojo! Always remember how much Bibo loves you ❤️') {
+        settings.daily_note_content = '';
+      }
       return {
-        settings: { ...DEFAULT_STATE.settings, ...(parsed.settings || {}) },
-        events: Array.isArray(parsed.events) ? parsed.events : DEFAULT_STATE.events,
-        envelopes: Array.isArray(parsed.envelopes) ? parsed.envelopes : DEFAULT_STATE.envelopes,
-        tracks: Array.isArray(parsed.tracks) ? parsed.tracks : DEFAULT_STATE.tracks,
-        memories: Array.isArray(parsed.memories) ? parsed.memories : DEFAULT_STATE.memories,
-        signals: Array.isArray(parsed.signals) ? parsed.signals : DEFAULT_STATE.signals,
-        assets: Array.isArray(parsed.assets) ? parsed.assets : DEFAULT_STATE.assets,
+        settings,
+        events: filterLegacy<EventVault>(parsed.events),
+        envelopes: filterLegacy<OpenWhenEnvelope>(parsed.envelopes),
+        tracks: filterLegacy<PlaylistTrack>(parsed.tracks),
+        memories: filterLegacy<Memory>(parsed.memories),
+        signals: filterLegacy<JojoSignal>(parsed.signals),
+        assets: filterLegacy<UploadedAsset>(parsed.assets),
       };
     }
   } catch { /* ignore */ }
@@ -123,14 +149,18 @@ export function PortalProvider({ children }: { children: React.ReactNode }) {
       });
 
       setState(prev => {
+        const rawSettings = settingsRes.data ? { ...prev.settings, ...settingsRes.data } : prev.settings;
+        if (rawSettings.daily_note_content === 'Good luck today my Jojo! Always remember how much Bibo loves you ❤️') {
+          rawSettings.daily_note_content = '';
+        }
         const next: PortalState = {
-          settings: settingsRes.data ? { ...prev.settings, ...settingsRes.data } : prev.settings,
-          events: Array.isArray(eventsRes.data) ? eventsRes.data : prev.events,
-          envelopes: Array.isArray(envelopesRes.data) ? envelopesRes.data : prev.envelopes,
-          tracks: Array.isArray(tracksRes.data) ? tracksRes.data : prev.tracks,
-          memories: Array.isArray(memoriesRes.data) ? memoriesRes.data : prev.memories,
-          signals: Array.isArray(signalsRes.data) ? signalsRes.data : prev.signals,
-          assets: Array.isArray(assetsRes.data) ? assetsRes.data : prev.assets,
+          settings: rawSettings,
+          events: Array.isArray(eventsRes.data) ? filterLegacy<EventVault>(eventsRes.data) : prev.events,
+          envelopes: Array.isArray(envelopesRes.data) ? filterLegacy<OpenWhenEnvelope>(envelopesRes.data) : prev.envelopes,
+          tracks: Array.isArray(tracksRes.data) ? filterLegacy<PlaylistTrack>(tracksRes.data) : prev.tracks,
+          memories: Array.isArray(memoriesRes.data) ? filterLegacy<Memory>(memoriesRes.data) : prev.memories,
+          signals: Array.isArray(signalsRes.data) ? filterLegacy<JojoSignal>(signalsRes.data) : prev.signals,
+          assets: Array.isArray(assetsRes.data) ? filterLegacy<UploadedAsset>(assetsRes.data) : prev.assets,
         };
         saveLocal(next);
         return next;
@@ -327,9 +357,16 @@ export function PortalProvider({ children }: { children: React.ReactNode }) {
 
   const upsertEvent = useCallback(async (event: EventVault) => {
     setState(prev => {
-      const idx = prev.events.findIndex(e => e.id === event.id);
-      const events = [...prev.events];
-      if (idx >= 0) events[idx] = event; else events.push(event);
+      let events = [...prev.events];
+      if (event.is_featured) {
+        events = events.map(e => (e.id === event.id ? event : { ...e, is_featured: false }));
+      }
+      const idx = events.findIndex(e => e.id === event.id);
+      if (idx >= 0) {
+        events[idx] = event;
+      } else {
+        events.unshift(event);
+      }
       const next = { ...prev, events };
       broadcast(next);
       return next;
@@ -337,8 +374,16 @@ export function PortalProvider({ children }: { children: React.ReactNode }) {
 
     if (client) {
       try {
+        if (event.is_featured) {
+          try {
+            await client.from('events_vault').update({ is_featured: false }).neq('id', event.id);
+          } catch { /* ignore */ }
+        }
         const { error } = await client.from('events_vault').upsert(event);
-        if (error) console.error('Supabase upsertEvent error:', error.message);
+        if (error) {
+          console.error('Supabase upsertEvent error:', error.message);
+          setCloudStatus(prev => ({ ...prev, error: error.message }));
+        }
       } catch (err: any) {
         console.error('Supabase upsertEvent error:', err);
       }
@@ -347,7 +392,12 @@ export function PortalProvider({ children }: { children: React.ReactNode }) {
 
   const deleteEvent = useCallback(async (id: string) => {
     setState(prev => {
-      const next = { ...prev, events: prev.events.filter(e => e.id !== id) };
+      const filtered = prev.events.filter(e => e.id !== id);
+      const hasFeatured = filtered.some(e => e.is_featured);
+      const events = (!hasFeatured && filtered.length > 0)
+        ? [{ ...filtered[0], is_featured: true }, ...filtered.slice(1)]
+        : filtered;
+      const next = { ...prev, events };
       broadcast(next);
       return next;
     });

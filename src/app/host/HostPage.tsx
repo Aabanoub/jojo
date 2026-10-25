@@ -7,6 +7,7 @@ import {
   Bell, Edit2, Play, Pause, ChevronDown, RotateCw, Plus, Trash2,
   Save, Check, X, Heart, Menu, ExternalLink, SkipForward, SkipBack,
   AlertCircle, Globe, Key, Calendar, User, FileText, Volume2, Upload, Copy,
+  Sparkles, Star, Camera,
 } from 'lucide-react';
 import { usePortal } from '@/lib/PortalProvider';
 import { uploadFile, BUCKETS, isSupabaseConfigured, getSupabaseCredentials } from '@/lib/supabase';
@@ -177,31 +178,47 @@ export default function HostPage() {
 
   // ── LOCAL EDITABLE COPIES ─────────────────────────────────────────────────
   const [dailyNote, setDailyNote] = useState(settings.daily_note_content);
+  const [dailyNoteTitle, setDailyNoteTitle] = useState(settings.daily_note_title || (settings.his_nickname ? `Daily Note from ${settings.his_nickname} 💌 :` : 'Daily Note 💌 :'));
+  const [isEditingDailyNote, setIsEditingDailyNote] = useState(false);
+  const dailyNoteEditorRef = useRef<HTMLDivElement>(null);
+
   const [settingsForm, setSettingsForm] = useState({
     his_name: settings.his_name,
     his_nickname: settings.his_nickname,
     her_name: settings.her_name,
     her_nickname: settings.her_nickname,
-    relationship_start: settings.relationship_start.slice(0, 10),
+    relationship_start: settings.relationship_start ? settings.relationship_start.slice(0, 10) : '',
     her_birthday: settings.her_birthday,
     master_password: settings.master_password,
     portal_title: settings.portal_title,
   });
 
   // Sync whenever settings change from external sources
-  useEffect(() => { setDailyNote(settings.daily_note_content); }, [settings.daily_note_content]);
+  useEffect(() => {
+    setDailyNote(settings.daily_note_content);
+    setDailyNoteTitle(settings.daily_note_title || (settings.his_nickname ? `Daily Note from ${settings.his_nickname} 💌 :` : 'Daily Note 💌 :'));
+  }, [settings.daily_note_content, settings.daily_note_title, settings.his_nickname]);
+
   useEffect(() => {
     setSettingsForm({
       his_name: settings.his_name,
       his_nickname: settings.his_nickname,
       her_name: settings.her_name,
       her_nickname: settings.her_nickname,
-      relationship_start: settings.relationship_start.slice(0, 10),
+      relationship_start: settings.relationship_start ? settings.relationship_start.slice(0, 10) : '',
       her_birthday: settings.her_birthday,
       master_password: settings.master_password,
       portal_title: settings.portal_title,
     });
   }, [settings]);
+
+  const saveDailyNote = async () => {
+    await doSave('daily-note', () => updateSettings({
+      daily_note_title: dailyNoteTitle,
+      daily_note_content: dailyNote,
+      daily_note_updated_at: new Date().toISOString(),
+    }));
+  };
 
   // ── NEW ENVELOPE FORM ────────────────────────────────────────────────────────
   const [envForm, setEnvForm] = useState({ title: '', emoji: '💌', letter_content: '', requires_password: false });
@@ -219,7 +236,7 @@ export default function HostPage() {
       : {
           id: `env-${Date.now()}`,
           ...envForm,
-          media_url: '/images/wax_envelope.jpg',
+          media_url: null,
           audio_url: null,
           sort_order: envelopes.length + 1,
           created_at: new Date().toISOString(),
@@ -245,7 +262,7 @@ export default function HostPage() {
       : {
           id: `track-${Date.now()}`,
           ...trackForm,
-          cover_url: '/images/couple_portrait.jpg',
+          cover_url: null,
           sort_order: tracks.length + 1,
           created_at: new Date().toISOString(),
         };
@@ -290,18 +307,7 @@ export default function HostPage() {
     }
   };
 
-  const handleRestoreDefaultAssets = async () => {
-    if (!confirm('Restore all default starter photos to the database?')) return;
-    const DEFAULT_STARTERS = [
-      { id: 'ast-1', name: 'couple_portrait.jpg', url: '/images/couple_portrait.jpg', created_at: new Date().toISOString() },
-      { id: 'ast-2', name: 'couple_garden.jpg', url: '/images/couple_garden.jpg', created_at: new Date().toISOString() },
-      { id: 'ast-3', name: 'couple_winter.jpg', url: '/images/couple_winter.jpg', created_at: new Date().toISOString() },
-      { id: 'ast-4', name: 'wax_envelope.jpg', url: '/images/wax_envelope.jpg', created_at: new Date().toISOString() },
-    ];
-    for (const ast of DEFAULT_STARTERS) {
-      await upsertAsset(ast);
-    }
-  };
+
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -348,37 +354,88 @@ export default function HostPage() {
   };
 
   // ── NEW EVENT FORM ────────────────────────────────────────────────────────────
-  const [evtForm, setEvtForm] = useState({ title: '', target_date: '', teaser_clue: '', vault_letter: '' });
+  const [evtForm, setEvtForm] = useState({
+    title: '',
+    target_date: '',
+    teaser_clue: '',
+    vault_letter: '',
+    subtitle: '',
+    is_featured: true,
+    unlock_method: 'scratch' as 'scratch' | 'password' | 'instant',
+  });
+  const [evtError, setEvtError] = useState<string | null>(null);
   const [editEvtId, setEditEvtId] = useState<string | null>(null);
 
   const openEditEvt = (evt: EventVault) => {
     setEditEvtId(evt.id);
+    setEvtError(null);
     setEvtForm({
       title: evt.title,
-      target_date: evt.target_date.slice(0, 10),
-      teaser_clue: evt.teaser_clue,
-      vault_letter: evt.vault_letter,
+      target_date: evt.target_date ? evt.target_date.slice(0, 10) : '',
+      teaser_clue: evt.teaser_clue || '',
+      vault_letter: evt.vault_letter || '',
+      subtitle: evt.subtitle || '',
+      is_featured: !!evt.is_featured,
+      unlock_method: evt.unlock_method || 'scratch',
     });
   };
 
   const saveEvt = async () => {
-    if (!evtForm.title.trim() || !evtForm.target_date) return;
-    const evt: EventVault = editEvtId
-      ? { ...(events.find(e => e.id === editEvtId)!), ...evtForm, target_date: evtForm.target_date + 'T00:00:00+03:00' }
+    setEvtError(null);
+    if (!evtForm.title.trim()) {
+      setEvtError('Please enter an event title (e.g. Our Anniversary ❤️)');
+      return;
+    }
+    if (!evtForm.target_date) {
+      setEvtError('Please pick a target unlock date for the countdown');
+      return;
+    }
+
+    const cleanDate = evtForm.target_date.includes('T')
+      ? evtForm.target_date
+      : `${evtForm.target_date}T00:00:00+03:00`;
+
+    const newId = typeof crypto !== 'undefined' && crypto.randomUUID
+      ? crypto.randomUUID()
+      : `evt-${Date.now()}`;
+
+    const existing = editEvtId ? events.find(e => e.id === editEvtId) : null;
+    const evt: EventVault = existing
+      ? {
+          ...existing,
+          title: evtForm.title.trim(),
+          target_date: cleanDate,
+          teaser_clue: evtForm.teaser_clue,
+          vault_letter: evtForm.vault_letter,
+          subtitle: evtForm.subtitle || existing.subtitle || '',
+          is_featured: evtForm.is_featured,
+          unlock_method: evtForm.unlock_method,
+        }
       : {
-          id: `evt-${Date.now()}`,
-          ...evtForm,
-          target_date: evtForm.target_date + 'T00:00:00+03:00',
-          subtitle: '',
-          is_featured: false,
-          unlock_method: 'scratch' as const,
+          id: newId,
+          title: evtForm.title.trim(),
+          subtitle: evtForm.subtitle || '',
+          target_date: cleanDate,
+          is_featured: evtForm.is_featured,
+          unlock_method: evtForm.unlock_method,
           event_password: settings.master_password,
           force_unlocked: false,
+          teaser_clue: evtForm.teaser_clue || '',
+          vault_letter: evtForm.vault_letter,
           vault_media: [],
           created_at: new Date().toISOString(),
         };
+
     await doSave('event', () => upsertEvent(evt));
-    setEvtForm({ title: '', target_date: '', teaser_clue: '', vault_letter: '' });
+    setEvtForm({
+      title: '',
+      target_date: '',
+      teaser_clue: '',
+      vault_letter: '',
+      subtitle: '',
+      is_featured: true,
+      unlock_method: 'scratch',
+    });
     setEditEvtId(null);
   };
 
@@ -537,8 +594,8 @@ export default function HostPage() {
                 <span className="absolute -top-0.5 -right-0.5 w-4 h-4 rounded-full bg-rose-500 text-[9px] text-white flex items-center justify-center font-bold">{unreadCount}</span>
               )}
             </button>
-            <div className="w-8 h-8 rounded-full overflow-hidden border border-rose-300/40 shrink-0">
-              <img src="/images/couple_portrait.jpg" alt="Bibo" className="w-full h-full object-cover" />
+            <div className="w-8 h-8 rounded-full border border-rose-300/40 shrink-0 bg-gradient-to-tr from-rose-500/30 to-pink-500/20 flex items-center justify-center text-xs font-bold text-rose-200">
+              {settings.his_nickname ? settings.his_nickname.slice(0, 1).toUpperCase() : '★'}
             </div>
           </div>
         </div>
@@ -610,9 +667,128 @@ export default function HostPage() {
                           </div>
                         ))}
                       </div>
-                      <div className="mt-2 p-3 rounded-xl bg-[#282632] border border-white/6">
-                        <p className="text-[11px] text-white/50 mb-1">Daily Note Preview</p>
-                        <p className="text-xs text-white/80 leading-relaxed" dir="auto">{settings.daily_note_content}</p>
+                      {/* Daily Note Preview & Live Editor */}
+                      <div
+                        ref={dailyNoteEditorRef}
+                        className={`mt-3 p-3.5 rounded-xl border transition-all duration-300 ${
+                          isEditingDailyNote
+                            ? 'bg-[#282632] border-rose-500/40 ring-1 ring-rose-500/20 shadow-lg'
+                            : 'bg-[#282632] border-white/6 hover:border-white/15'
+                        }`}
+                      >
+                        <div className="flex items-center justify-between mb-2 pb-1.5 border-b border-white/5">
+                          <div className="flex items-center gap-2">
+                            <span className="text-sm">💌</span>
+                            <span className="text-[11px] font-semibold text-white/90">Daily Note Preview</span>
+                            <ClientDate
+                              date={settings.daily_note_updated_at}
+                              className="text-[10px] text-white/40 hidden sm:inline"
+                            />
+                          </div>
+                          <div className="flex items-center gap-1.5">
+                            {isEditingDailyNote ? (
+                              <button
+                                onClick={() => {
+                                  setIsEditingDailyNote(false);
+                                  setDailyNote(settings.daily_note_content);
+                                  setDailyNoteTitle(settings.daily_note_title || `Daily Note from ${settings.his_nickname || 'Bibo'} 💌 :`);
+                                }}
+                                className="px-2 py-0.5 rounded-lg text-[10px] text-white/50 hover:text-white/80 hover:bg-white/5 flex items-center gap-1 transition-colors"
+                              >
+                                <X size={10} /> Cancel
+                              </button>
+                            ) : (
+                              <button
+                                onClick={() => setIsEditingDailyNote(true)}
+                                className="px-2.5 py-1 rounded-lg text-[10px] font-semibold bg-rose-500/15 text-rose-300 border border-rose-500/30 hover:bg-rose-500/25 flex items-center gap-1 transition-all active:scale-95 shadow-sm"
+                              >
+                                <Edit2 size={10} /> Edit Note
+                              </button>
+                            )}
+                          </div>
+                        </div>
+
+                        {isEditingDailyNote ? (
+                          <div className="space-y-3 pt-1">
+                            <div>
+                              <label className="text-[10px] text-white/50 mb-1 block font-medium">Note Title</label>
+                              <DarkInput
+                                value={dailyNoteTitle}
+                                onChange={(e) => setDailyNoteTitle(e.target.value)}
+                                placeholder={`Daily Note from ${settings.his_nickname || 'Bibo'} 💌 :`}
+                              />
+                            </div>
+                            <div>
+                              <div className="flex items-center justify-between mb-1">
+                                <label className="text-[10px] text-white/50 font-medium">Note Message (Arabic & English)</label>
+                                <span className="text-[9px] text-white/30">{dailyNote.length} characters</span>
+                              </div>
+                              <DarkTextarea
+                                value={dailyNote}
+                                onChange={setDailyNote}
+                                placeholder="Write a daily message for Jojo..."
+                                rows={4}
+                              />
+                            </div>
+
+                            {/* Quick sweet presets for Bibo */}
+                            <div>
+                              <p className="text-[9px] text-white/40 mb-1 flex items-center gap-1">
+                                <Sparkles size={9} className="text-amber-300/80" /> Quick sweet ideas:
+                              </p>
+                              <div className="flex flex-wrap gap-1.5">
+                                {[
+                                  'Good luck today my Jojo! Always remember how much Bibo loves you ❤️',
+                                  'صباح الجمال والورد على أحلى عيون في الدنيا، بحبك يا جوجو 💕',
+                                  'Thinking of you every single second. You make my whole world brighter ✨',
+                                  'You are my favorite person in the entire universe! Can\'t wait to see you 🥰',
+                                ].map((preset, idx) => (
+                                  <button
+                                    key={idx}
+                                    type="button"
+                                    onClick={() => setDailyNote(preset)}
+                                    className="text-[9px] px-2 py-1 rounded-md bg-white/5 hover:bg-white/10 text-white/60 hover:text-white/90 border border-white/5 truncate max-w-[210px] transition-all"
+                                    title={preset}
+                                  >
+                                    &ldquo;{preset.slice(0, 26)}...&rdquo;
+                                  </button>
+                                ))}
+                              </div>
+                            </div>
+
+                            <div className="flex items-center justify-between pt-1">
+                              <p className="text-[9px] text-white/40">Updates instantly on Jojo&apos;s home screen 🚀</p>
+                              <div className="flex items-center gap-2">
+                                <SaveBtn
+                                  onClick={async () => {
+                                    await saveDailyNote();
+                                    setTimeout(() => setIsEditingDailyNote(false), 900);
+                                  }}
+                                  saved={saved === 'daily-note'}
+                                  label="Update Note Live"
+                                />
+                              </div>
+                            </div>
+                          </div>
+                        ) : (
+                          <div
+                            onClick={() => setIsEditingDailyNote(true)}
+                            className="group cursor-pointer rounded-lg p-3 bg-[#201E27] border border-white/5 hover:border-rose-400/30 hover:bg-[#23202c] transition-all relative"
+                            title="Click to edit daily note"
+                          >
+                            <div className="flex items-center justify-between mb-1.5">
+                              <p className="text-[11px] font-semibold text-rose-300/90 tracking-wide">
+                                {settings.daily_note_title || `Daily Note from ${settings.his_nickname || 'Bibo'} 💌 :`}
+                              </p>
+                              <span className="text-[9px] opacity-0 group-hover:opacity-100 text-rose-300/70 flex items-center gap-1 transition-opacity">
+                                <Edit2 size={9} /> Click to edit
+                              </span>
+                            </div>
+                            <p className="text-xs text-white/80 leading-relaxed font-sans whitespace-pre-wrap selection:bg-rose-500/30" dir="auto">
+                              {settings.daily_note_content}
+                            </p>
+                          </div>
+                        )}
                       </div>
                     </Panel>
 
@@ -827,13 +1003,40 @@ export default function HostPage() {
                     <Panel title="Countdown Events" sub="Event Vault">
                       <div className="space-y-2">
                         {events.map((evt) => (
-                          <div key={evt.id} className="p-3 rounded-xl bg-[#282632] border border-white/6 flex items-start justify-between gap-2">
+                          <div
+                            key={evt.id}
+                            className={`p-3 rounded-xl border flex items-start justify-between gap-2 transition-all ${
+                              evt.is_featured
+                                ? 'bg-amber-500/10 border-amber-400/30 ring-1 ring-amber-400/20'
+                                : 'bg-[#282632] border-white/6'
+                            }`}
+                          >
                             <div className="flex-1 min-w-0">
-                              <p className="text-xs font-semibold text-white truncate">{evt.title}</p>
-                              <p className="text-[10px] text-white/40">{new Date(evt.target_date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}</p>
+                              <div className="flex items-center gap-2 mb-0.5">
+                                <p className="text-xs font-semibold text-white truncate">{evt.title}</p>
+                                {evt.is_featured ? (
+                                  <span className="text-[9px] px-1.5 py-0.5 rounded-md bg-amber-400/20 text-amber-300 font-semibold border border-amber-400/30 flex items-center gap-0.5 shrink-0">
+                                    <Star size={9} className="fill-amber-300" /> Main Hero
+                                  </span>
+                                ) : null}
+                              </div>
+                              <p className="text-[10px] text-white/40">
+                                {new Date(evt.target_date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
+                              </p>
                               {evt.teaser_clue && <p className="text-[10px] text-rose-300/70 mt-0.5 truncate">&ldquo;{evt.teaser_clue}&rdquo;</p>}
                             </div>
                             <div className="flex items-center gap-1 shrink-0">
+                              <button
+                                onClick={() => upsertEvent({ ...evt, is_featured: !evt.is_featured })}
+                                title={evt.is_featured ? 'Featured on hero countdown' : 'Click to set as main hero countdown'}
+                                className={`w-6 h-6 rounded-lg flex items-center justify-center transition-colors ${
+                                  evt.is_featured
+                                    ? 'bg-amber-400/20 text-amber-300'
+                                    : 'bg-white/5 text-white/40 hover:text-amber-300 hover:bg-white/10'
+                                }`}
+                              >
+                                <Star size={11} className={evt.is_featured ? 'fill-amber-300' : ''} />
+                              </button>
                               <button
                                 onClick={() => { openEditEvt(evt); }}
                                 className="w-6 h-6 rounded-lg bg-white/5 hover:bg-white/10 flex items-center justify-center transition-colors"
@@ -857,24 +1060,84 @@ export default function HostPage() {
 
                     {/* Add / Edit Event Form */}
                     <Panel title={editEvtId ? 'Edit Event' : 'Add New Event'} sub="Event Vault">
+                      {evtError && (
+                        <div className="p-2.5 rounded-xl bg-red-500/15 border border-red-500/30 text-red-300 text-xs flex items-center gap-2">
+                          <AlertCircle size={14} className="shrink-0 text-red-400" />
+                          <span>{evtError}</span>
+                        </div>
+                      )}
                       <div className="space-y-3">
                         <FieldRow label="Event Title">
-                          <DarkInput value={evtForm.title} onChange={(e) => setEvtForm(f => ({ ...f, title: e.target.value }))} placeholder="e.g. Valentine's Day ❤️" />
+                          <DarkInput
+                            value={evtForm.title}
+                            onChange={(e) => {
+                              setEvtForm(f => ({ ...f, title: e.target.value }));
+                              if (evtError) setEvtError(null);
+                            }}
+                            placeholder="e.g. Valentine's Day ❤️, Our Anniversary 💕"
+                          />
                         </FieldRow>
-                        <FieldRow label="Target Date (unlocks at midnight)">
-                          <DarkInput type="date" value={evtForm.target_date} onChange={(e) => setEvtForm(f => ({ ...f, target_date: e.target.value }))} />
+                        <FieldRow label="Target Unlock Date">
+                          <DarkInput
+                            type="date"
+                            value={evtForm.target_date}
+                            style={{ colorScheme: 'dark' }}
+                            onChange={(e) => {
+                              setEvtForm(f => ({ ...f, target_date: e.target.value }));
+                              if (evtError) setEvtError(null);
+                            }}
+                          />
                         </FieldRow>
+                        <FieldRow label="Subtitle / Tagline (Optional)">
+                          <DarkInput
+                            value={evtForm.subtitle}
+                            onChange={(e) => setEvtForm(f => ({ ...f, subtitle: e.target.value }))}
+                            placeholder="e.g. Special Countdown for Jojo"
+                          />
+                        </FieldRow>
+                        <div className="flex items-center justify-between p-3 rounded-xl bg-[#282632] border border-white/6">
+                          <div>
+                            <p className="text-xs font-medium text-white">Feature on Jojo&apos;s Hero Banner</p>
+                            <p className="text-[10px] text-white/40">Shows this countdown directly at the top of her home page</p>
+                          </div>
+                          <Toggle
+                            value={evtForm.is_featured}
+                            onChange={(v) => setEvtForm(f => ({ ...f, is_featured: v }))}
+                          />
+                        </div>
                         <FieldRow label="Teaser Clue (shown while locked)">
-                          <DarkTextarea value={evtForm.teaser_clue} onChange={(v) => setEvtForm(f => ({ ...f, teaser_clue: v }))} placeholder="A hint for Jojo..." rows={2} />
+                          <DarkTextarea
+                            value={evtForm.teaser_clue}
+                            onChange={(v) => setEvtForm(f => ({ ...f, teaser_clue: v }))}
+                            placeholder="A hint for Jojo..."
+                            rows={2}
+                          />
                         </FieldRow>
                         <FieldRow label="Secret Letter (revealed on unlock)">
-                          <DarkTextarea value={evtForm.vault_letter} onChange={(v) => setEvtForm(f => ({ ...f, vault_letter: v }))} placeholder="Write a love letter to Jojo..." rows={4} />
+                          <DarkTextarea
+                            value={evtForm.vault_letter}
+                            onChange={(v) => setEvtForm(f => ({ ...f, vault_letter: v }))}
+                            placeholder="Write a love letter to Jojo..."
+                            rows={4}
+                          />
                         </FieldRow>
                         <div className="flex gap-2">
                           <SaveBtn onClick={saveEvt} saved={saved === 'event'} label={editEvtId ? 'Update Event' : 'Add Event'} />
                           {editEvtId && (
                             <button
-                              onClick={() => { setEditEvtId(null); setEvtForm({ title: '', target_date: '', teaser_clue: '', vault_letter: '' }); }}
+                              onClick={() => {
+                                setEditEvtId(null);
+                                setEvtError(null);
+                                setEvtForm({
+                                  title: '',
+                                  target_date: '',
+                                  teaser_clue: '',
+                                  vault_letter: '',
+                                  subtitle: '',
+                                  is_featured: true,
+                                  unlock_method: 'scratch',
+                                });
+                              }}
                               className="px-4 py-2 rounded-xl text-xs font-medium bg-white/5 border border-white/10 text-white/60 hover:bg-white/10"
                             >
                               Cancel
@@ -951,8 +1214,12 @@ export default function HostPage() {
                       <div className="space-y-2 max-h-72 overflow-y-auto">
                         {memories.map((mem) => (
                           <div key={mem.id} className="p-3 rounded-xl bg-[#282632] border border-white/6 flex items-center gap-3">
-                            <div className="w-12 h-12 rounded-xl overflow-hidden shrink-0 border border-white/10">
-                              <img src={mem.image_url || '/images/couple_garden.jpg'} alt={mem.title} className="w-full h-full object-cover" />
+                            <div className="w-12 h-12 rounded-xl overflow-hidden shrink-0 border border-white/10 bg-white/5 flex items-center justify-center">
+                              {mem.image_url ? (
+                                <img src={mem.image_url} alt={mem.title} className="w-full h-full object-cover" />
+                              ) : (
+                                <Camera size={16} className="text-white/30" />
+                              )}
                             </div>
                             <div className="flex-1 min-w-0">
                               <p className="text-xs font-medium text-white truncate">{mem.title}</p>
@@ -992,7 +1259,7 @@ export default function HostPage() {
                             <DarkInput
                               value={memForm.image_url}
                               onChange={(e) => setMemForm(f => ({ ...f, image_url: e.target.value }))}
-                              placeholder="/images/couple_garden.jpg or https://..."
+                              placeholder="https://... or upload photo"
                             />
                             <button
                               type="button"
@@ -1007,7 +1274,7 @@ export default function HostPage() {
                         </FieldRow>
                         {memForm.image_url && (
                           <div className="w-full h-28 rounded-xl overflow-hidden border border-white/10">
-                            <img src={memForm.image_url} alt="Preview" className="w-full h-full object-cover" onError={(e) => { e.currentTarget.src = '/images/couple_garden.jpg'; }} />
+                            <img src={memForm.image_url} alt="Preview" className="w-full h-full object-cover" />
                           </div>
                         )}
                         <div className="flex gap-2">
@@ -1047,13 +1314,7 @@ export default function HostPage() {
                               className="hidden"
                               onChange={handleFileUpload}
                             />
-                            <button
-                              onClick={handleRestoreDefaultAssets}
-                              className="px-2.5 py-2 rounded-xl text-[11px] font-medium bg-white/5 border border-white/10 text-white/50 hover:bg-white/10 hover:text-white/80 transition-colors"
-                              title="Restore starter photos"
-                            >
-                              Restore Defaults
-                            </button>
+
                             <button
                               onClick={() => fileInputRef.current?.click()}
                               disabled={isUploading}
@@ -1130,13 +1391,8 @@ export default function HostPage() {
                         </div>
                         {assets.length === 0 && (
                           <div className="text-center py-8">
-                            <p className="text-xs text-white/40">No photos in the library.</p>
-                            <button
-                              onClick={handleRestoreDefaultAssets}
-                              className="mt-2 text-xs text-rose-400 hover:underline"
-                            >
-                              Restore default starter photos
-                            </button>
+                            <p className="text-xs text-white/40">No photos in the library yet.</p>
+                            <p className="text-[11px] text-white/30 mt-1">Upload photos to use across your memories and vault.</p>
                           </div>
                         )}
                       </Panel>
@@ -1151,6 +1407,13 @@ export default function HostPage() {
                   <>
                     {/* Daily Note Editor */}
                     <Panel title="Daily Note to Jojo" sub="Music & Notes">
+                      <FieldRow label="Note Title / Header">
+                        <DarkInput
+                          value={dailyNoteTitle}
+                          onChange={(e) => setDailyNoteTitle(e.target.value)}
+                          placeholder={`Daily Note from ${settings.his_nickname || 'Bibo'} 💌 :`}
+                        />
+                      </FieldRow>
                       <FieldRow label="Note Content (supports Arabic & English)">
                         <DarkTextarea
                           value={dailyNote}
@@ -1161,10 +1424,7 @@ export default function HostPage() {
                       </FieldRow>
                       <p className="text-[10px] text-white/30">This note appears at the top of Jojo&apos;s home page every day.</p>
                       <SaveBtn
-                        onClick={() => doSave('daily-note', () => updateSettings({
-                          daily_note_content: dailyNote,
-                          daily_note_updated_at: new Date().toISOString(),
-                        }))}
+                        onClick={saveDailyNote}
                         saved={saved === 'daily-note'}
                         label="Publish Note to Jojo"
                       />
@@ -1175,8 +1435,12 @@ export default function HostPage() {
                       <div className="space-y-2 max-h-52 overflow-y-auto">
                         {tracks.map((track) => (
                           <div key={track.id} className="p-3 rounded-xl bg-[#282632] border border-white/6 flex items-center gap-3">
-                            <div className="w-9 h-9 rounded-xl overflow-hidden shrink-0 border border-white/10 bg-pink-100/10">
-                              <img src={track.cover_url || '/images/couple_portrait.jpg'} alt={track.title} className="w-full h-full object-cover" />
+                            <div className="w-9 h-9 rounded-xl overflow-hidden shrink-0 border border-white/10 bg-white/5 flex items-center justify-center text-xs">
+                              {track.cover_url ? (
+                                <img src={track.cover_url} alt={track.title} className="w-full h-full object-cover" />
+                              ) : (
+                                <span>🎵</span>
+                              )}
                             </div>
                             <div className="flex-1 min-w-0">
                               <p className="text-xs font-medium text-white truncate">{track.title}</p>
@@ -1564,15 +1828,32 @@ export default function HostPage() {
                 </div>
 
                 {/* Daily Note preview */}
-                <div className="rounded-xl p-2 bg-white/50 mb-2 border border-white/60">
-                  <p className="text-[9px] font-medium opacity-60 mb-0.5">Daily Note from {settings.his_nickname} 💌 :</p>
+                <div
+                  onClick={() => {
+                    setActiveNav('dashboard');
+                    setIsEditingDailyNote(true);
+                    dailyNoteEditorRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                  }}
+                  className="rounded-xl p-2 bg-white/50 mb-2 border border-white/60 cursor-pointer hover:bg-white/75 hover:border-rose-400/50 transition-all group relative shadow-sm"
+                  title="Click to edit Daily Note"
+                >
+                  <div className="flex items-center justify-between mb-0.5">
+                    <p className="text-[9px] font-medium opacity-60 truncate">
+                      {settings.daily_note_title || `Daily Note from ${settings.his_nickname || 'Bibo'} 💌 :`}
+                    </p>
+                    <Edit2 size={8} className="opacity-0 group-hover:opacity-70 text-[#3E2328] transition-opacity shrink-0" />
+                  </div>
                   <p className="text-[9px] leading-snug opacity-80 line-clamp-2" dir="auto">{settings.daily_note_content}</p>
                 </div>
 
                 {/* Countdown preview */}
-                <div className="rounded-xl p-2 bg-white/50 mb-2 border border-white/60 text-center">
+                <div
+                  onClick={() => setActiveNav('events')}
+                  className="rounded-xl p-2 bg-white/50 mb-2 border border-white/60 text-center cursor-pointer hover:bg-white/75 hover:border-rose-400/50 transition-all group"
+                  title="Click to manage countdown events"
+                >
                   <p className="text-[9px] font-bold text-[#3E2328]" style={{ fontFamily: "'Playfair Display', serif" }}>
-                    {events[0]?.title || "Valentine's Day ❤️"}
+                    {(events.find(e => e.is_featured) || events[0])?.title || "No Upcoming Event"}
                   </p>
                   <div className="flex justify-center gap-2 mt-1">
                     {['DD', 'HH', 'MM', 'SS'].map((u) => (
@@ -1584,13 +1865,21 @@ export default function HostPage() {
                   </div>
                 </div>
 
-                {/* Couple photo */}
+                {/* Photo preview */}
                 <div className="flex justify-center">
                   <div
-                    className="w-20 h-20 rounded-2xl overflow-hidden border-2 shadow-md"
+                    className="w-20 h-20 rounded-2xl overflow-hidden border-2 shadow-md bg-white/40 flex items-center justify-center text-rose-300"
                     style={{ borderColor: settings.accent_color + '80' }}
                   >
-                    <img src="/images/couple_portrait.jpg" alt="Bibo & Jojo" className="w-full h-full object-cover" />
+                    {(memories.find(m => !!m.image_url)?.image_url || assets[0]?.url) ? (
+                      <img
+                        src={memories.find(m => !!m.image_url)?.image_url || assets[0]?.url}
+                        alt="Preview"
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      <Camera size={20} className="opacity-40" />
+                    )}
                   </div>
                 </div>
               </div>

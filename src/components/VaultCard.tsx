@@ -30,11 +30,7 @@ export default function VaultCard({ event, accentColor }: VaultCardProps) {
   const isTimeReached = new Date().getTime() >= new Date(event.target_date).getTime() || event.force_unlocked || isSimulated;
 
   const photos = (event.vault_media || []).filter(m => m.type === 'image');
-  const displayPhotos = photos.length > 0 ? photos : [
-    { id: '1', type: 'image' as const, url: '/images/couple_portrait.jpg', caption: 'Surprise_Pic.jpg' },
-    { id: '2', type: 'image' as const, url: '/images/couple_garden.jpg', caption: '15/09/2025' },
-    { id: '3', type: 'image' as const, url: '/images/couple_winter.jpg', caption: '24/12/2025' },
-  ];
+  const displayPhotos = photos;
 
   // ─────────────────────────────────────────────────────────────
   // 1. LOCKED STATE
@@ -56,17 +52,17 @@ export default function VaultCard({ event, accentColor }: VaultCardProps) {
           Locked Digital Vault
         </h3>
 
-        {/* 3 Blurred photo thumbnails with golden Scratch Unlock overlay */}
+        {/* Photo thumbnails or frosted gradient backdrop with golden Scratch Unlock overlay */}
         <div className="relative w-full h-32 rounded-2xl overflow-hidden flex gap-2 p-1.5 bg-white/20">
-          <div className="flex-1 rounded-xl overflow-hidden filter blur-sm">
-            <img src={displayPhotos[0]?.url || '/images/couple_portrait.jpg'} alt="Preview 1" className="w-full h-full object-cover" />
-          </div>
-          <div className="flex-1 rounded-xl overflow-hidden filter blur-sm">
-            <img src={displayPhotos[1]?.url || '/images/couple_garden.jpg'} alt="Preview 2" className="w-full h-full object-cover" />
-          </div>
-          <div className="flex-1 rounded-xl overflow-hidden filter blur-sm">
-            <img src={displayPhotos[2]?.url || '/images/couple_winter.jpg'} alt="Preview 3" className="w-full h-full object-cover" />
-          </div>
+          {photos.length > 0 ? (
+            photos.slice(0, 3).map((p, i) => (
+              <div key={p.id || i} className="flex-1 rounded-xl overflow-hidden filter blur-sm">
+                <img src={p.url} alt={`Preview ${i + 1}`} className="w-full h-full object-cover" />
+              </div>
+            ))
+          ) : (
+            <div className="w-full h-full rounded-xl bg-gradient-to-r from-pink-200/40 via-rose-200/30 to-amber-200/40" />
+          )}
 
           {/* Golden Scratch & Unlock overlay */}
           <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/10 backdrop-blur-[2px]">
@@ -185,14 +181,14 @@ export default function VaultCard({ event, accentColor }: VaultCardProps) {
         }}
       >
         <h4 className="text-base text-[#44292E] font-script text-center font-bold">
-          A Secret Letter from Bibo to Jojo 💌
+          A Secret Letter 💌
         </h4>
 
         <div
           className="text-xs md:text-sm leading-relaxed text-[#44292E] text-center font-serif-elegant whitespace-pre-line"
           dir="auto"
         >
-          {event.vault_letter || `Happy ${event.title}, my love!\nEvery moment with you is a dream.\nHere's to us, forever... ❤️`}
+          {event.vault_letter || 'Surprise unlocked! 🎉'}
         </div>
 
         {/* Voice Note Player Pill inside Letter */}
@@ -214,75 +210,79 @@ export default function VaultCard({ event, accentColor }: VaultCardProps) {
         </div>
       </motion.div>
 
-      {/* Polaroid Memories Carousel */}
-      <motion.div
-        initial={{ y: 20, opacity: 0 }}
-        animate={{ y: 0, opacity: 1 }}
-        transition={{ delay: 0.2 }}
-        className="rounded-3xl p-5 shadow-sm relative overflow-hidden"
-        style={{
-          background: 'rgba(255, 255, 255, 0.55)',
-          backdropFilter: 'blur(16px)',
-          border: '1px solid rgba(255, 255, 255, 0.7)',
-        }}
-      >
-        <div className="flex items-center justify-between mb-3">
-          <h4
-            className="text-xs font-bold text-[#44292E]"
-            style={{ fontFamily: "'Playfair Display', serif" }}
-          >
-            Our Moments Together
-          </h4>
-          <span className="text-[10px] text-[#7A5B61]">
-            {currentPhotoIdx + 1} / {displayPhotos.length}
-          </span>
-        </div>
-
-        <div className="relative">
-          <AnimatePresence mode="wait">
-            <motion.div
-              key={currentPhotoIdx}
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.95 }}
-              transition={{ duration: 0.25 }}
-              className="bg-white p-3 pb-6 rounded-2xl shadow-md mx-auto max-w-xs"
-              style={{ transform: 'rotate(-1deg)' }}
+      {/* Polaroid Memories Carousel (rendered only if photos were attached to event) */}
+      {photos.length > 0 && (
+        <motion.div
+          initial={{ y: 20, opacity: 0 }}
+          animate={{ y: 0, opacity: 1 }}
+          transition={{ delay: 0.2 }}
+          className="rounded-3xl p-5 shadow-sm relative overflow-hidden"
+          style={{
+            background: 'rgba(255, 255, 255, 0.55)',
+            backdropFilter: 'blur(16px)',
+            border: '1px solid rgba(255, 255, 255, 0.7)',
+          }}
+        >
+          <div className="flex items-center justify-between mb-3">
+            <h4
+              className="text-xs font-bold text-[#44292E]"
+              style={{ fontFamily: "'Playfair Display', serif" }}
             >
-              <div className="w-full h-64 rounded-xl overflow-hidden bg-pink-50">
-                <img
-                  src={displayPhotos[currentPhotoIdx]?.url || '/images/couple_portrait.jpg'}
-                  alt={displayPhotos[currentPhotoIdx]?.caption || 'Couple memory'}
-                  className="w-full h-full object-cover"
-                />
-              </div>
-              <p
-                className="text-xs text-center text-[#5D3A42] font-mono mt-3"
-                dir="auto"
-              >
-                {displayPhotos[currentPhotoIdx]?.caption || 'Special Memory 💕'}
-              </p>
-            </motion.div>
-          </AnimatePresence>
+              Vault Photos
+            </h4>
+            <span className="text-[10px] text-[#7A5B61]">
+              {currentPhotoIdx + 1} / {photos.length}
+            </span>
+          </div>
 
-          {displayPhotos.length > 1 && (
-            <>
-              <button
-                onClick={() => setCurrentPhotoIdx((prev) => (prev - 1 + displayPhotos.length) % displayPhotos.length)}
-                className="absolute left-1 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-white/90 shadow-md flex items-center justify-center text-[#44292E] hover:bg-white transition-all active:scale-95"
+          <div className="relative">
+            <AnimatePresence mode="wait">
+              <motion.div
+                key={currentPhotoIdx}
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.95 }}
+                transition={{ duration: 0.25 }}
+                className="bg-white p-3 pb-6 rounded-2xl shadow-md mx-auto max-w-xs"
+                style={{ transform: 'rotate(-1deg)' }}
               >
-                <ChevronLeft size={16} />
-              </button>
-              <button
-                onClick={() => setCurrentPhotoIdx((prev) => (prev + 1) % displayPhotos.length)}
-                className="absolute right-1 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-white/90 shadow-md flex items-center justify-center text-[#44292E] hover:bg-white transition-all active:scale-95"
-              >
-                <ChevronRight size={16} />
-              </button>
-            </>
-          )}
-        </div>
-      </motion.div>
+                <div className="w-full h-64 rounded-xl overflow-hidden bg-pink-50">
+                  <img
+                    src={photos[currentPhotoIdx]?.url}
+                    alt={photos[currentPhotoIdx]?.caption || 'Vault photo'}
+                    className="w-full h-full object-cover"
+                  />
+                </div>
+                {photos[currentPhotoIdx]?.caption && (
+                  <p
+                    className="text-xs text-center text-[#5D3A42] font-mono mt-3"
+                    dir="auto"
+                  >
+                    {photos[currentPhotoIdx]?.caption}
+                  </p>
+                )}
+              </motion.div>
+            </AnimatePresence>
+
+            {photos.length > 1 && (
+              <>
+                <button
+                  onClick={() => setCurrentPhotoIdx((prev) => (prev - 1 + photos.length) % photos.length)}
+                  className="absolute left-1 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-white/90 shadow-md flex items-center justify-center text-[#44292E] hover:bg-white transition-all active:scale-95"
+                >
+                  <ChevronLeft size={16} />
+                </button>
+                <button
+                  onClick={() => setCurrentPhotoIdx((prev) => (prev + 1) % photos.length)}
+                  className="absolute right-1 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-white/90 shadow-md flex items-center justify-center text-[#44292E] hover:bg-white transition-all active:scale-95"
+                >
+                  <ChevronRight size={16} />
+                </button>
+              </>
+            )}
+          </div>
+        </motion.div>
+      )}
 
       {/* Love Coupon Box */}
       <motion.div

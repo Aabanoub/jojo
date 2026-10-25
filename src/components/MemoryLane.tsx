@@ -1,7 +1,7 @@
 'use client';
 
 import { motion } from 'framer-motion';
-import { Heart } from 'lucide-react';
+import { Heart, Camera } from 'lucide-react';
 import type { Memory } from '@/lib/types';
 
 interface MemoryLaneProps {
@@ -10,26 +10,31 @@ interface MemoryLaneProps {
 }
 
 export default function MemoryLane({ memories, accentColor }: MemoryLaneProps) {
-  const displayMemories = memories.length > 0 ? memories : [
-    {
-      id: 'mem-1',
-      title: '15 Sep 2025 — Where It All Began 💕',
-      memory_date: '2025-09-15',
-      caption: 'Our very first day together. The start of forever.',
-      image_url: '/images/couple_garden.jpg',
-      sort_order: 1,
-      created_at: '2025-09-15T12:00:00.000Z',
-    },
-    {
-      id: 'mem-2',
-      title: '24 Dec 2025 — Cozy Winter 🎄',
-      memory_date: '2025-12-24',
-      caption: 'Warm cocoa, twinkling lights, and you by my side.',
-      image_url: '/images/couple_winter.jpg',
-      sort_order: 2,
-      created_at: '2025-12-24T12:00:00.000Z',
-    },
-  ];
+  if (!memories || memories.length === 0) {
+    return (
+      <div
+        className="rounded-3xl p-8 shadow-sm text-center"
+        style={{
+          background: 'rgba(255, 255, 255, 0.55)',
+          backdropFilter: 'blur(16px)',
+          border: '1px solid rgba(255, 255, 255, 0.7)',
+        }}
+      >
+        <span className="text-3xl block mb-2">📷</span>
+        <h3
+          className="text-sm font-bold text-[#44292E]"
+          style={{ fontFamily: "'Playfair Display', serif" }}
+        >
+          No Memories Added Yet
+        </h3>
+        <p className="text-xs text-[#7A5B61] mt-1 max-w-xs mx-auto">
+          Add special dates and polaroid photos in Host Studio to build your timeline!
+        </p>
+      </div>
+    );
+  }
+
+  const displayMemories = memories;
 
   return (
     <div
@@ -86,11 +91,17 @@ export default function MemoryLane({ memories, accentColor }: MemoryLaneProps) {
                     className="w-[125px] shrink-0 p-1.5 pb-3 bg-white rounded-xl shadow-md transition-transform hover:scale-105"
                     style={{ transform: `rotate(${rotation})` }}
                   >
-                    <img
-                      src={mem.image_url || '/images/couple_garden.jpg'}
-                      alt={mem.title}
-                      className="w-full h-24 object-cover rounded-lg"
-                    />
+                    {mem.image_url ? (
+                      <img
+                        src={mem.image_url}
+                        alt={mem.title}
+                        className="w-full h-24 object-cover rounded-lg"
+                      />
+                    ) : (
+                      <div className="w-full h-24 rounded-lg bg-pink-100/60 flex items-center justify-center text-rose-300">
+                        <Camera size={22} />
+                      </div>
+                    )}
                     <p className="text-[8px] text-gray-400 text-center font-mono mt-1">{formattedDate}</p>
                   </div>
 
@@ -141,11 +152,17 @@ export default function MemoryLane({ memories, accentColor }: MemoryLaneProps) {
                     className="w-[125px] shrink-0 p-1.5 pb-3 bg-white rounded-xl shadow-md transition-transform hover:scale-105"
                     style={{ transform: `rotate(${rotation})` }}
                   >
-                    <img
-                      src={mem.image_url || '/images/couple_winter.jpg'}
-                      alt={mem.title}
-                      className="w-full h-24 object-cover rounded-lg"
-                    />
+                    {mem.image_url ? (
+                      <img
+                        src={mem.image_url}
+                        alt={mem.title}
+                        className="w-full h-24 object-cover rounded-lg"
+                      />
+                    ) : (
+                      <div className="w-full h-24 rounded-lg bg-pink-100/60 flex items-center justify-center text-rose-300">
+                        <Camera size={22} />
+                      </div>
+                    )}
                     <p className="text-[8px] text-gray-400 text-center font-mono mt-1">{formattedDate}</p>
                   </div>
                 </>

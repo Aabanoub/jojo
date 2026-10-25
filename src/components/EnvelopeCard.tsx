@@ -68,7 +68,7 @@ export default function EnvelopeCard({ envelope, accentColor, masterPassword = '
               Open When...
             </h4>
             <p className="text-[11px] text-[#6E474F] mt-1 font-medium">
-              {envelope.title.replace('Open when ', '').replace('Open When...', '') || 'you miss Bibo 💌'}
+              {envelope.title.replace(/^open when\s*/i, '') || envelope.title}
             </p>
           </div>
 
@@ -163,11 +163,17 @@ export default function EnvelopeCard({ envelope, accentColor, masterPassword = '
       <div className="relative rounded-2xl overflow-hidden p-3 bg-gradient-to-br from-pink-50/50 to-rose-100/50 flex flex-col items-center">
         {/* Wax seal open envelope photo */}
         <div className="w-full h-44 rounded-xl overflow-hidden shadow-inner flex items-center justify-center relative">
-          <img
-            src={envelope.media_url || '/images/wax_envelope.jpg'}
-            alt="Wax Envelope"
-            className="w-full h-full object-cover"
-          />
+          {envelope.media_url ? (
+            <img
+              src={envelope.media_url}
+              alt={envelope.title}
+              className="w-full h-full object-cover"
+            />
+          ) : (
+            <div className="w-full h-full bg-gradient-to-br from-pink-200/50 via-rose-100/40 to-amber-100/50 flex items-center justify-center">
+              <span className="text-4xl opacity-70">💌</span>
+            </div>
+          )}
 
           {/* Letter note sticking out */}
           <div
