@@ -678,7 +678,7 @@ export default function JojoPage() {
         )}
       </AnimatePresence>
 
-      {/* Live Signal Popup from Bibo */}
+      {/* Live Signal Popup from Bibo - strictly discreet without exposing personal info */}
       <AnimatePresence>
         {latestIncomingSignal && (
           <motion.div
@@ -697,17 +697,17 @@ export default function JojoPage() {
             }}
           >
             <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-rose-500 to-pink-500 flex items-center justify-center text-white shrink-0 text-base shadow-xs animate-bounce">
-              ❤️
+              🔔
             </div>
             <div className="flex-1 min-w-0">
               <div className="flex items-center justify-between">
-                <span className="text-[11px] font-bold text-rose-800">
-                  {isSafetyMode ? 'Love Signal 💕' : `Love Signal from ${displayHisNick} 💕`}
+                <span className="text-xs font-bold text-rose-800">
+                  New Notification
                 </span>
-                <span className="text-[9px] text-rose-500 underline font-medium">Tap to reply</span>
+                <span className="text-[9px] text-rose-500 underline font-medium">Tap to open</span>
               </div>
-              <p className="text-xs text-[#44292E] font-medium truncate mt-0.5" dir="auto">
-                {isSafetyMode ? mask(latestIncomingSignal.message) : latestIncomingSignal.message}
+              <p className="text-[11px] text-[#7A5B61] mt-0.5">
+                New notification
               </p>
             </div>
           </motion.div>

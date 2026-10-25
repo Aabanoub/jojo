@@ -10,6 +10,7 @@ import {
   Sparkles, Star, Camera, Send,
 } from 'lucide-react';
 import { usePortal } from '@/lib/PortalProvider';
+import { requestNotificationPermission } from '@/lib/notifications';
 import { uploadFile, uploadFileDetailed, BUCKETS, isSupabaseConfigured, getSupabaseCredentials, compressImage, getSupabase, resolveSupabaseCloud } from '@/lib/supabase';
 import { generateUUID, type EventVault, type OpenWhenEnvelope, type PlaylistTrack, type Memory } from '@/lib/types';
 import ClientDate from '@/components/ClientDate';
@@ -142,6 +143,26 @@ export default function HostPage() {
   const [alertSentSuccess, setAlertSentSuccess] = useState(false);
   const [signalFilter, setSignalFilter] = useState<'all' | 'from_jojo' | 'from_bibo'>('all');
   const signalEditorRef = useRef<HTMLDivElement>(null);
+
+  // Host Device Notification State (Enables Bibo to receive phone/browser alerts too)
+  const [hostNotifPermission, setHostNotifPermission] = useState<string>('default');
+  const [isRequestingHostNotif, setIsRequestingHostNotif] = useState(false);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined' && 'Notification' in window) {
+      setHostNotifPermission(Notification.permission);
+    }
+  }, []);
+
+  const handleEnableHostNotifications = async () => {
+    setIsRequestingHostNotif(true);
+    try {
+      const res = await requestNotificationPermission();
+      setHostNotifPermission(res.permission);
+    } finally {
+      setIsRequestingHostNotif(false);
+    }
+  };
 
   const handleSendPushAlert = async (msgToSend?: string) => {
     const text = (msgToSend || alertText).trim();
@@ -747,20 +768,25 @@ export default function HostPage() {
             )}
           </div>
 
-          {/* Signal alert */}
+          {/* Signal alert - strictly discreet without exposing personal info */}
           {latestSignal && (
-            <div
-              className="px-4 py-1.5 rounded-full text-xs font-medium flex items-center gap-2 shadow-sm"
+            <button
+              onClick={() => {
+                setActiveNav('dashboard');
+                setTimeout(() => {
+                  signalEditorRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                }, 100);
+              }}
+              className="px-3 py-1 rounded-full text-xs font-semibold flex items-center gap-1.5 shadow-sm cursor-pointer hover:brightness-110 transition-all border border-rose-500/30 text-rose-200"
               style={{
                 background: 'linear-gradient(135deg, rgba(235,145,130,0.25), rgba(220,120,110,0.2))',
-                border: '1px solid rgba(240,160,150,0.35)',
-                color: '#F9D0C8',
               }}
+              title="Click to view in private"
             >
-              <span>🔔</span>
-              <span>Jojo: &ldquo;{latestSignal.message}&rdquo;</span>
-              <ClientDate date={latestSignal.created_at} className="text-[10px] opacity-60" />
-            </div>
+              <Bell size={12} className="animate-bounce text-rose-300" />
+              <span>New Notification</span>
+              <span className="text-[9px] opacity-70 underline ml-0.5">View</span>
+            </button>
           )}
 
           <div className="flex items-center gap-2.5">
@@ -802,11 +828,24 @@ export default function HostPage() {
             <span className="text-[11px] text-white/40 font-mono border border-white/10 px-2 py-0.5 rounded-full flex items-center gap-1">
               <Key size={10} className="text-amber-400" /> {settings.master_password}
             </span>
+            {hostNotifPermission !== 'granted' && (
+              <button
+                onClick={handleEnableHostNotifications}
+                disabled={isRequestingHostNotif}
+                className="px-2.5 py-1 rounded-full text-[11px] font-semibold bg-rose-500/20 text-rose-300 border border-rose-500/40 hover:bg-rose-500/30 flex items-center gap-1 transition-all cursor-pointer"
+                title="Enable discreet notifications for your device"
+              >
+                <Bell size={11} className="animate-pulse" />
+                <span>{isRequestingHostNotif ? 'Enabling...' : 'Enable Alerts 🔔'}</span>
+              </button>
+            )}
+
             <button
               onClick={() => { signals.forEach(s => !s.is_read && markSignalRead(s.id)); }}
-              className="w-8 h-8 rounded-full bg-white/5 border border-white/10 flex items-center justify-center text-white/70 hover:bg-white/10 relative"
+              className="w-8 h-8 rounded-full bg-white/5 border border-white/10 flex items-center justify-center text-white/70 hover:bg-white/10 relative cursor-pointer"
+              title="Alerts active. Click to mark all read."
             >
-              <Bell size={14} />
+              <Bell size={14} className={hostNotifPermission === 'granted' ? 'text-emerald-400' : ''} />
               {unreadCount > 0 && (
                 <span className="absolute -top-0.5 -right-0.5 w-4 h-4 rounded-full bg-rose-500 text-[9px] text-white flex items-center justify-center font-bold">{unreadCount}</span>
               )}
