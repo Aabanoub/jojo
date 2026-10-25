@@ -608,51 +608,46 @@ export default function JojoPage() {
       {/* Dynamic Particle atmosphere layer */}
       <ParticleBackground effect={settings.particle_effect || 'sakura'} accentColor={settings.accent_color} />
 
-      {/* Floating Safety Button pill in top left */}
-      <div className="fixed top-3 left-3 z-40 select-none">
+      {/* ─────────────────────────────────────────────────────────────
+          UNIFIED TOP HEADER: Safety Icon (Left), Portal Title (Center), Play/Pause (Right)
+         ───────────────────────────────────────────────────────────── */}
+      <header
+        className="sticky top-0 z-40 w-full px-4 py-2.5 flex items-center justify-between select-none backdrop-blur-xl border-b transition-colors shadow-2xs"
+        style={{
+          background: 'rgba(255, 255, 255, 0.65)',
+          borderColor: 'rgba(255, 255, 255, 0.75)',
+        }}
+      >
+        {/* Left: Safety Button (EMOJI / ICON ONLY - name completely removed) */}
         <motion.button
-          whileHover={{ scale: 1.04 }}
-          whileTap={{ scale: 0.94 }}
+          whileHover={{ scale: 1.08 }}
+          whileTap={{ scale: 0.92 }}
           onClick={toggleSafetyMode}
-          title={isSafetyMode ? "Safety Button Active: Names hidden. Click to restore." : "Safety Button: Click to hide all names and nicknames."}
-          className="rounded-2xl p-1.5 px-3 shadow-md flex items-center gap-2 backdrop-blur-xl border transition-all cursor-pointer"
-          style={{
-            background: isSafetyMode ? 'rgba(236, 253, 245, 0.94)' : 'rgba(255, 255, 255, 0.78)',
-            borderColor: isSafetyMode ? 'rgba(52, 211, 153, 0.8)' : 'rgba(255, 255, 255, 0.85)',
-            boxShadow: isSafetyMode ? '0 8px 24px rgba(16, 185, 129, 0.25)' : '0 8px 24px rgba(212, 140, 150, 0.22)',
-          }}
+          title={isSafetyMode ? "Safety Mode: Names are hidden. Tap to restore." : "Safety Mode: Tap to hide all names."}
+          className={`w-9 h-9 rounded-full flex items-center justify-center transition-all cursor-pointer shadow-xs border ${
+            isSafetyMode
+              ? 'bg-emerald-500 border-emerald-400 text-white shadow-emerald-500/25 ring-2 ring-emerald-300/40'
+              : 'bg-white/80 hover:bg-white border-white/90 text-rose-500 shadow-rose-200/40'
+          }`}
         >
-          <div
-            className={`w-7 h-7 rounded-xl flex items-center justify-center transition-colors shadow-2xs ${
-              isSafetyMode ? 'bg-emerald-500 text-white' : 'bg-rose-100/90 text-rose-600'
-            }`}
-          >
-            {isSafetyMode ? <ShieldCheck size={16} /> : <Shield size={16} />}
-          </div>
-
-          <div className="flex flex-col text-left">
-            <div className="flex items-center gap-1.5">
-              <span
-                className={`text-[11px] font-bold tracking-tight transition-colors ${
-                  isSafetyMode ? 'text-emerald-900' : 'text-[#44292E]'
-                }`}
-              >
-                {isSafetyMode ? 'Safety: Active' : 'Safety Button'}
-              </span>
-              {isSafetyMode && (
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping" />
-              )}
-            </div>
-            <span
-              className={`text-[9px] font-medium leading-none ${
-                isSafetyMode ? 'text-emerald-700' : 'text-[#8C6B72]'
-              }`}
-            >
-              {isSafetyMode ? 'Names Hidden' : 'Hide Names'}
-            </span>
-          </div>
+          {isSafetyMode ? (
+            <ShieldCheck size={18} className="drop-shadow-xs" />
+          ) : (
+            <Shield size={18} className="drop-shadow-xs" />
+          )}
         </motion.button>
-      </div>
+
+        {/* Center: Discreet Portal Title */}
+        <span
+          className="text-xs font-semibold tracking-wide truncate max-w-[170px] sm:max-w-xs"
+          style={{ color: settings.text_primary || '#44292E' }}
+        >
+          {displayPortalTitle}
+        </span>
+
+        {/* Right: Music Player (PLAY & PAUSE BUTTON ONLY) */}
+        <MusicPlayer tracks={safeTracks} accentColor={settings.accent_color} />
+      </header>
 
       {/* Floating Toast Notification */}
       <AnimatePresence>
@@ -661,7 +656,7 @@ export default function JojoPage() {
             initial={{ opacity: 0, y: -10, scale: 0.95 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: -10, scale: 0.95 }}
-            className="fixed top-16 left-3 z-50 rounded-2xl px-3.5 py-2 text-xs font-semibold shadow-xl border backdrop-blur-md flex items-center gap-2"
+            className="fixed top-14 left-4 z-50 rounded-2xl px-3 py-1.5 text-xs font-semibold shadow-xl border backdrop-blur-md flex items-center gap-2"
             style={{
               background: isSafetyMode ? 'rgba(236, 253, 245, 0.95)' : 'rgba(255, 245, 247, 0.95)',
               borderColor: isSafetyMode ? '#34D399' : '#F472B6',
@@ -671,8 +666,8 @@ export default function JojoPage() {
             <span>{isSafetyMode ? '🛡️' : '✨'}</span>
             <span>
               {isSafetyMode
-                ? 'Safety Button Active: All names & nicknames hidden'
-                : 'Safety Button Off: Names and nicknames restored'}
+                ? 'Names hidden'
+                : 'Names restored'}
             </span>
           </motion.div>
         )}
@@ -713,9 +708,6 @@ export default function JojoPage() {
           </motion.div>
         )}
       </AnimatePresence>
-
-      {/* Floating Music Player pill in top right */}
-      <MusicPlayer tracks={safeTracks} accentColor={settings.accent_color} />
 
       {/* ─────────────────────────────────────────────────────────────
           PORTAL LOCK OVERLAY (When Bibo locks her page)
