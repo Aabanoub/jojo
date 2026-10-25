@@ -25,7 +25,7 @@ interface PortalContextType {
   deleteEvent: (id: string) => Promise<void>;
   upsertEnvelope: (envelope: OpenWhenEnvelope) => Promise<void>;
   deleteEnvelope: (id: string) => Promise<void>;
-  upsertTrack: (track: PlaylistTrack) => Promise<void>;
+  upsertTrack: (track: PlaylistTrack) => Promise<{ success: boolean; error?: string }>;
   deleteTrack: (id: string) => Promise<void>;
   upsertMemory: (memory: Memory) => Promise<{ success: boolean; error?: string }>;
   deleteMemory: (id: string) => Promise<void>;
@@ -477,7 +477,7 @@ export function PortalProvider({ children }: { children: React.ReactNode }) {
     }
   }, [client, broadcast]);
 
-  const upsertTrack = useCallback(async (track: PlaylistTrack) => {
+  const upsertTrack = useCallback(async (track: PlaylistTrack): Promise<{ success: boolean; error?: string }> => {
     setState(prev => {
       const idx = prev.tracks.findIndex(t => t.id === track.id);
       const tracks = [...prev.tracks];
@@ -487,14 +487,22 @@ export function PortalProvider({ children }: { children: React.ReactNode }) {
       return next;
     });
 
-    if (client) {
+    const activeClient = client || getSupabase();
+    if (activeClient) {
       try {
-        const { error } = await client.from('playlist_tracks').upsert(track);
-        if (error) console.error('Supabase upsertTrack error:', error.message);
+        const { error } = await activeClient.from('playlist_tracks').upsert(track);
+        if (error) {
+          console.error('Supabase upsertTrack error:', error.message);
+          setCloudStatus(prev => ({ ...prev, error: error.message }));
+          return { success: false, error: error.message };
+        }
+        return { success: true };
       } catch (err: any) {
         console.error('Supabase upsertTrack error:', err);
+        return { success: false, error: err?.message || 'Network error' };
       }
     }
+    return { success: false, error: 'Database is not connected on this device' };
   }, [client, broadcast]);
 
   const deleteTrack = useCallback(async (id: string) => {
@@ -504,9 +512,10 @@ export function PortalProvider({ children }: { children: React.ReactNode }) {
       return next;
     });
 
-    if (client) {
+    const activeClient = client || getSupabase();
+    if (activeClient) {
       try {
-        const { error } = await client.from('playlist_tracks').delete().eq('id', id);
+        const { error } = await activeClient.from('playlist_tracks').delete().eq('id', id);
         if (error) console.error('Supabase deleteTrack error:', error.message);
       } catch (err: any) {
         console.error('Supabase deleteTrack error:', err);

@@ -12,6 +12,7 @@ import { generateUUID, type Memory } from '@/lib/types';
 import ParticleBackground from '@/components/ParticleBackground';
 import MusicPlayer from '@/components/MusicPlayer';
 import CountdownDisplay from '@/components/CountdownDisplay';
+import MusicSection from '@/components/MusicSection';
 import VaultCard from '@/components/VaultCard';
 import EnvelopeCard from '@/components/EnvelopeCard';
 import MemoryLane from '@/components/MemoryLane';
@@ -649,6 +650,13 @@ export default function JojoPage() {
                 <VaultCard event={selectedEvent} accentColor={settings.accent_color} />
               </section>
             )}
+
+            {/* Card 4: Our Songs & Soundtrack */}
+            <MusicSection
+              tracks={tracks}
+              accentColor={settings.accent_color}
+              hisNickname={settings.his_nickname || 'Bibo'}
+            />
           </motion.div>
         )}
 

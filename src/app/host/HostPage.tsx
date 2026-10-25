@@ -395,20 +395,29 @@ export default function HostPage() {
   };
 
   const saveTrack = async () => {
-    if (!trackForm.title.trim() || !trackForm.audio_url.trim()) return;
+    if (!trackForm.title.trim() || !trackForm.audio_url.trim()) {
+      alert('Please provide both Song Title and Audio File/URL.');
+      return;
+    }
     const track: PlaylistTrack = editTrackId
       ? { ...(tracks.find(t => t.id === editTrackId)!), ...trackForm }
       : {
-          id: `track-${Date.now()}`,
+          id: generateUUID(),
           ...trackForm,
           cover_url: null,
           sort_order: tracks.length + 1,
           created_at: new Date().toISOString(),
         };
-    await doSave('track', () => upsertTrack(track));
-    setTrackForm({ title: '', artist: '', audio_url: '' });
-    setEditTrackId(null);
-    setAudioUploadError(null);
+    await doSave('track', async () => {
+      const res = await upsertTrack(track);
+      if (res && !res.success) {
+        alert(`Could not save song to Supabase: ${res.error}\n\nPlease check playlist_tracks table permissions in Supabase SQL editor.`);
+      } else {
+        setTrackForm({ title: '', artist: '', audio_url: '' });
+        setEditTrackId(null);
+        setAudioUploadError(null);
+      }
+    });
   };
 
   // ── NEW MEMORY FORM ───────────────────────────────────────────────────────────
