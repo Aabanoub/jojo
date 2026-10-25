@@ -108,6 +108,7 @@ export default function HostPage() {
     deleteTrack,
     upsertMemory,
     deleteMemory,
+    sendSignal,
     markSignalRead,
     upsertAsset,
     deleteAsset,
@@ -134,6 +135,30 @@ export default function HostPage() {
   const [testingDb, setTestingDb] = useState(false);
   const [dbTestResult, setDbTestResult] = useState<{ success: boolean; message: string } | null>(null);
   const [copiedSyncLink, setCopiedSyncLink] = useState(false);
+
+  // Live Alert / Phone Notification Transmitter State
+  const [alertText, setAlertText] = useState('');
+  const [sendingAlert, setSendingAlert] = useState(false);
+  const [alertSentSuccess, setAlertSentSuccess] = useState(false);
+
+  const handleSendPushAlert = async (msgToSend?: string) => {
+    const text = (msgToSend || alertText).trim();
+    if (!text) return;
+    setSendingAlert(true);
+    try {
+      await sendSignal({
+        signal_type: 'push_alert',
+        message: text,
+      });
+      setAlertSentSuccess(true);
+      if (!msgToSend) setAlertText('');
+      setTimeout(() => setAlertSentSuccess(false), 3500);
+    } catch (err: any) {
+      alert(`Could not send alert: ${err?.message || err}`);
+    } finally {
+      setSendingAlert(false);
+    }
+  };
 
   // Check sessionStorage on mount
   useEffect(() => {
@@ -976,6 +1001,84 @@ ALTER TABLE public.site_settings ADD COLUMN IF NOT EXISTS lock_message text DEFA
                           ) : (
                             <span className="text-[10px] text-amber-300/80">Connect Supabase in Settings below</span>
                           )}
+                        </div>
+                      </div>
+
+                      {/* Live Phone Notification Transmitter */}
+                      <div className="mt-3 p-3.5 rounded-xl bg-[#282632] border border-white/6 hover:border-white/15 transition-all">
+                        <div className="flex items-center justify-between mb-2">
+                          <div className="flex items-center gap-2">
+                            <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-rose-500/20 to-pink-500/20 border border-rose-500/30 flex items-center justify-center text-rose-300">
+                              <Bell size={14} className="animate-pulse" />
+                            </div>
+                            <div>
+                              <h3 className="text-xs font-semibold text-white flex items-center gap-1.5">
+                                <span>Send Live Alert to Jojo&apos;s Phone</span>
+                                <span className="text-[10px] font-normal text-rose-300/80">(إشعار فوري لموبايل جوجو)</span>
+                              </h3>
+                              <p className="text-[10px] text-white/40">
+                                Rings a sweet chime 🔔, vibrates her phone 📳, and shows on her lock screen!
+                              </p>
+                            </div>
+                          </div>
+                          {alertSentSuccess && (
+                            <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 text-[10px] font-medium flex items-center gap-1 animate-fade-in">
+                              <Check size={11} /> Sent to her phone!
+                            </span>
+                          )}
+                        </div>
+
+                        {/* Quick Preset Buttons */}
+                        <div className="mb-2.5">
+                          <span className="text-[10px] text-white/50 block mb-1 font-medium">Quick Love Signals:</span>
+                          <div className="flex flex-wrap gap-1.5">
+                            {[
+                              { label: 'وحشتيني اوي ❤️', text: 'وحشتيني اوي اوي يا روحي ❤️' },
+                              { label: 'Love Ping 💕', text: 'Thinking of you right this second, my Jojo 💕' },
+                              { label: 'Check the app! ✨', text: 'افتحي الـ Love Space بتاعنا في مفاجأة جديدة عشانك! ✨' },
+                              { label: 'بموت فيكي يا كتكوتة 🐣', text: 'بموت فيكي يا كتكوتة يا اجمل حاجة في حياتي 🐣' },
+                              { label: 'Good Luck 🍀', text: 'ربنا معاكي ويوفقك يا احلى بنوتة في الكون 🍀❤️' },
+                            ].map((preset, idx) => (
+                              <button
+                                key={idx}
+                                type="button"
+                                disabled={sendingAlert}
+                                onClick={() => handleSendPushAlert(preset.text)}
+                                className="px-2.5 py-1 rounded-lg bg-white/5 hover:bg-rose-500/20 hover:border-rose-500/30 border border-white/10 text-[11px] text-white/80 hover:text-white transition-all cursor-pointer flex items-center gap-1 active:scale-95 disabled:opacity-50"
+                              >
+                                <span>{preset.label}</span>
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+
+                        {/* Custom Message Input */}
+                        <div className="flex gap-2">
+                          <input
+                            type="text"
+                            value={alertText}
+                            onChange={(e) => setAlertText(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter' && !sendingAlert && alertText.trim()) {
+                                handleSendPushAlert();
+                              }
+                            }}
+                            placeholder="Type a custom alert for her phone (اكتب رسالة فورية توصل لموبايلها)..."
+                            className="flex-1 px-3 py-1.5 rounded-xl bg-[#1E1D24] border border-white/10 text-xs text-white placeholder-white/30 outline-none focus:border-rose-400/50 transition-colors"
+                          />
+                          <button
+                            type="button"
+                            disabled={sendingAlert || !alertText.trim()}
+                            onClick={() => handleSendPushAlert()}
+                            className="px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-rose-500 to-pink-500 hover:from-rose-600 hover:to-pink-600 text-white text-xs font-semibold shadow-sm transition-all cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1.5 active:scale-95 shrink-0"
+                          >
+                            {sendingAlert ? (
+                              <RotateCw size={12} className="animate-spin" />
+                            ) : (
+                              <Sparkles size={12} />
+                            )}
+                            <span>{sendingAlert ? 'Sending...' : 'Send Alert 🚀'}</span>
+                          </button>
                         </div>
                       </div>
 

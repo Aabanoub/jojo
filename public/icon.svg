@@ -1,0 +1,37 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FF9A9E" />
+      <stop offset="50%" stop-color="#FECFEF" />
+      <stop offset="100%" stop-color="#F8DCDA" />
+    </linearGradient>
+    <linearGradient id="heartGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FF4B72" />
+      <stop offset="60%" stop-color="#E1306C" />
+      <stop offset="100%" stop-color="#C72C5E" />
+    </linearGradient>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="12" stdDeviation="16" flood-color="#D48C96" flood-opacity="0.45" />
+    </filter>
+  </defs>
+
+  <!-- Background with rounded squircles -->
+  <rect width="512" height="512" rx="128" fill="url(#bgGrad)" />
+
+  <!-- Outer soft glow ring -->
+  <circle cx="256" cy="256" r="190" fill="none" stroke="#FFFFFF" stroke-opacity="0.6" stroke-width="6" />
+
+  <!-- 3D Heart Symbol -->
+  <g filter="url(#shadow)">
+    <path
+      d="M256 410 C256 410 100 310 100 196 C100 130 152 82 216 82 C242 82 266 94 282 114 C298 94 322 82 348 82 C412 82 464 130 464 196 C464 310 308 410 256 410 Z"
+      fill="url(#heartGrad)"
+      transform="translate(-28, -20) scale(1.1)"
+    />
+  </g>
+
+  <!-- Sparkles -->
+  <path d="M140 130 Q140 155 115 155 Q140 155 140 180 Q140 155 165 155 Q140 155 140 130 Z" fill="#FFE27A" />
+  <path d="M380 110 Q380 130 360 130 Q380 130 380 150 Q380 130 400 130 Q380 130 380 110 Z" fill="#FFFFFF" />
+  <circle cx="395" cy="180" r="8" fill="#FFE27A" opacity="0.9" />
+</svg>

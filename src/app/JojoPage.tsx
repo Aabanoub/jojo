@@ -4,12 +4,13 @@ import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Home, Lock, Mail, Camera, Heart, ChevronDown, Send, Clock, Sparkles,
-  Plus, Upload, RotateCw, Check, X, Shield, ShieldCheck,
+  Plus, Upload, RotateCw, Check, X, Shield, ShieldCheck, Bell,
 } from 'lucide-react';
 import { usePortal } from '@/lib/PortalProvider';
 import { uploadFileDetailed, BUCKETS, isSupabaseConfigured, compressImage, getSupabase, resolveSupabaseCloud } from '@/lib/supabase';
 import { generateUUID, type Memory } from '@/lib/types';
 import { createNameMasker } from '@/lib/safety';
+import { getNotificationPermission, requestNotificationPermission, sendLoveNotification } from '@/lib/notifications';
 import ParticleBackground from '@/components/ParticleBackground';
 import MusicPlayer from '@/components/MusicPlayer';
 import CountdownDisplay from '@/components/CountdownDisplay';
@@ -68,6 +69,40 @@ export default function JojoPage() {
   const displayPortalTitle = isSafetyMode ? 'Our Space ✨' : (settings.portal_title || `${displayHisNick} & ${displayHerNick} ✨`);
   const displayDailyNoteTitle = isSafetyMode ? 'Daily Note 💌 :' : mask(settings.daily_note_title || `Daily Note from ${displayHisNick} 💌 :`);
   const displayDailyNoteContent = isSafetyMode ? mask(settings.daily_note_content) : settings.daily_note_content;
+
+  // ── Push / Mobile Notifications State ──────────────────────────────────────
+  const [notifPermission, setNotifPermission] = useState<string>('default');
+  const [isRequestingNotif, setIsRequestingNotif] = useState(false);
+  const [showNotifToast, setShowNotifToast] = useState(false);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      setNotifPermission(getNotificationPermission());
+    }
+  }, []);
+
+  const handleEnableNotifications = async () => {
+    setIsRequestingNotif(true);
+    try {
+      const res = await requestNotificationPermission();
+      setNotifPermission(res.permission);
+      if (res.granted) {
+        setShowNotifToast(true);
+        setTimeout(() => setShowNotifToast(false), 3000);
+      }
+    } finally {
+      setIsRequestingNotif(false);
+    }
+  };
+
+  const handleTestNotification = async () => {
+    await sendLoveNotification('Our Space 🔔💕', {
+      body: 'Notifications are active! You will now receive love alerts & notes here ✨',
+      tag: 'test-' + Date.now(),
+    });
+    setShowNotifToast(true);
+    setTimeout(() => setShowNotifToast(false), 3000);
+  };
 
   // ── Pre-flight Database Gatekeeper Algorithm ────────────────────────────────
   // Prevents rendering any page components until the database lock status is verified!
@@ -779,6 +814,54 @@ export default function JojoPage() {
                 )}
               </AnimatePresence>
             </header>
+
+            {/* Notification Permission Card / Status */}
+            {notifPermission === 'default' && (
+              <motion.div
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="p-3.5 rounded-2xl flex items-center justify-between gap-3 shadow-xs"
+                style={{
+                  background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.75), rgba(255, 240, 245, 0.65))',
+                  border: '1.5px solid rgba(255, 255, 255, 0.9)',
+                  backdropFilter: 'blur(16px)',
+                }}
+              >
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-rose-400 to-pink-400 flex items-center justify-center text-white shrink-0 shadow-xs">
+                    <Bell size={15} />
+                  </div>
+                  <div className="min-w-0">
+                    <h4 className="text-xs font-bold text-[#44292E] truncate">Get Live Alerts on Phone 🔔</h4>
+                    <p className="text-[10px] text-[#7A5B61] truncate">Get notified when new notes & surprises drop</p>
+                  </div>
+                </div>
+
+                <button
+                  onClick={handleEnableNotifications}
+                  disabled={isRequestingNotif}
+                  className="px-3 py-1.5 rounded-xl text-xs font-semibold text-white shadow-xs shrink-0 hover:scale-105 active:scale-95 transition-all cursor-pointer"
+                  style={{ background: 'linear-gradient(135deg, #E08594 0%, #C46D7D 100%)' }}
+                >
+                  {isRequestingNotif ? 'Enabling...' : 'Enable 🔔'}
+                </button>
+              </motion.div>
+            )}
+
+            {notifPermission === 'granted' && (
+              <div className="flex items-center justify-between px-1">
+                <span className="text-[10px] text-[#7A5B61] opacity-75">Live alerts to your phone are on ✨</span>
+                <button
+                  onClick={handleTestNotification}
+                  className="inline-flex items-center gap-1.5 text-[10px] font-medium px-2.5 py-1 rounded-full text-emerald-800 bg-emerald-50/80 hover:bg-emerald-100/90 border border-emerald-200 shadow-2xs transition-all cursor-pointer"
+                  title="Tap to test phone sound and notification"
+                >
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                  <span>🔔 Alerts Active</span>
+                  <span className="text-[9px] opacity-70 underline ml-0.5">Test Alert</span>
+                </button>
+              </div>
+            )}
 
             {/* Card 1: Daily Note */}
             <section

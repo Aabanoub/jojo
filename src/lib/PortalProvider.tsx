@@ -5,6 +5,7 @@ import type { PortalState, SiteSettings, EventVault, OpenWhenEnvelope, PlaylistT
 import { DEFAULT_STATE } from './seed';
 import { supabase as initialSupabase, isSupabaseConfigured as initialConfigured, updateSupabaseConfig, getSupabaseCredentials, getSupabase, resolveSupabaseCloud } from './supabase';
 import type { SupabaseClient } from '@supabase/supabase-js';
+import { sendLoveNotification } from './notifications';
 
 const STORAGE_KEY = 'bibo_jojo_portal';
 const CHANNEL_NAME = 'bibo_jojo_sync';
@@ -287,37 +288,85 @@ export function PortalProvider({ children }: { children: React.ReactNode }) {
         .channel('portal-realtime')
         .on('postgres_changes', { event: '*', schema: 'public', table: 'site_settings' }, (payload) => {
           if (payload.new) {
+            const newSettings = payload.new as SiteSettings;
             setState(s => {
-              const next = { ...s, settings: { ...s.settings, ...(payload.new as SiteSettings) } };
+              // Trigger notification if daily note updated
+              if (
+                newSettings.daily_note_content &&
+                newSettings.daily_note_content !== s.settings.daily_note_content
+              ) {
+                const isSafety = typeof window !== 'undefined' && localStorage.getItem('jojo_safety_mode') === 'true';
+                const title = isSafety ? 'Daily Note 💌' : `Daily Note from ${newSettings.his_nickname || 'Bibo'} 💌`;
+                sendLoveNotification(title, {
+                  body: isSafety ? 'A new sweet note was posted 💕' : newSettings.daily_note_content.slice(0, 80),
+                  tag: 'daily-note',
+                });
+              }
+              const next = { ...s, settings: { ...s.settings, ...newSettings } };
               saveLocal(next);
               return next;
             });
           }
         })
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'events_vault' }, () => {
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'events_vault' }, (payload) => {
           activeClient.from('events_vault').select('*').order('created_at').then(({ data }) => {
             if (Array.isArray(data)) setState(s => { const next = { ...s, events: data }; saveLocal(next); return next; });
           });
+          if (payload.new) {
+            const evt = payload.new as EventVault;
+            if (evt.force_unlocked) {
+              const isSafety = typeof window !== 'undefined' && localStorage.getItem('jojo_safety_mode') === 'true';
+              sendLoveNotification('Digital Vault Unlocked! 🎉', {
+                body: isSafety ? 'A surprise is ready to be opened! ✨' : `Surprise "${evt.title}" is ready! ✨`,
+                tag: 'vault-' + evt.id,
+              });
+            }
+          }
         })
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'open_when_envelopes' }, () => {
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'open_when_envelopes' }, (payload) => {
           activeClient.from('open_when_envelopes').select('*').order('sort_order').then(({ data }) => {
             if (Array.isArray(data)) setState(s => { const next = { ...s, envelopes: data }; saveLocal(next); return next; });
           });
+          if (payload.eventType === 'INSERT' && payload.new) {
+            const env = payload.new as OpenWhenEnvelope;
+            const isSafety = typeof window !== 'undefined' && localStorage.getItem('jojo_safety_mode') === 'true';
+            sendLoveNotification('Open When Envelope 💌', {
+              body: isSafety ? 'A new letter was added to your envelopes 💕' : `New letter: "${env.title}"`,
+              tag: 'envelope-' + env.id,
+            });
+          }
         })
         .on('postgres_changes', { event: '*', schema: 'public', table: 'playlist_tracks' }, () => {
           activeClient.from('playlist_tracks').select('*').order('sort_order').then(({ data }) => {
             if (Array.isArray(data)) setState(s => { const next = { ...s, tracks: data }; saveLocal(next); return next; });
           });
         })
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'memories' }, () => {
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'memories' }, (payload) => {
           activeClient.from('memories').select('*').order('sort_order').then(({ data }) => {
             if (Array.isArray(data)) setState(s => { const next = { ...s, memories: data }; saveLocal(next); return next; });
           });
+          if (payload.eventType === 'INSERT' && payload.new) {
+            const mem = payload.new as Memory;
+            const isSafety = typeof window !== 'undefined' && localStorage.getItem('jojo_safety_mode') === 'true';
+            sendLoveNotification('New Memory Added 📷💕', {
+              body: isSafety ? 'A new memory was added to our timeline!' : `New moment: "${mem.title}"`,
+              tag: 'memory-' + mem.id,
+            });
+          }
         })
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'jojo_signals' }, () => {
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'jojo_signals' }, (payload) => {
           activeClient.from('jojo_signals').select('*').order('created_at', { ascending: false }).then(({ data }) => {
             if (Array.isArray(data)) setState(s => { const next = { ...s, signals: data }; saveLocal(next); return next; });
           });
+          if (payload.eventType === 'INSERT' && payload.new) {
+            const sig = payload.new as JojoSignal;
+            const isSafety = typeof window !== 'undefined' && localStorage.getItem('jojo_safety_mode') === 'true';
+            const title = isSafety ? 'Love Alert 💕' : 'Love Signal from Our Space 💕';
+            sendLoveNotification(title, {
+              body: sig.message || 'You received a sweet love signal! ❤️',
+              tag: 'signal-' + sig.id,
+            });
+          }
         })
         .on('postgres_changes', { event: '*', schema: 'public', table: 'uploaded_assets' }, () => {
           activeClient.from('uploaded_assets').select('*').order('created_at', { ascending: false }).then(({ data }) => {

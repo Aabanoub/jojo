@@ -1,0 +1,19 @@
+{
+  "name": "Our Space 💕 Bibo & Jojo",
+  "short_name": "Our Space",
+  "description": "Our private space for secret letters, countdowns, playlists, and cherished memories.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#F8DCDA",
+  "theme_color": "#F8DCDA",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
