@@ -9,10 +9,12 @@ export default function MusicSection({
   tracks,
   accentColor = '#D48C96',
   hisNickname = 'Bibo',
+  isSafetyMode = false,
 }: {
   tracks: PlaylistTrack[];
   accentColor?: string;
   hisNickname?: string;
+  isSafetyMode?: boolean;
 }) {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -99,7 +101,7 @@ export default function MusicSection({
           أغانينا الخاصة 🎵
         </h3>
         <p className="text-xs text-[#7A5B61] leading-relaxed max-w-xs mx-auto" dir="auto">
-          {hisNickname} بيجهّز قائمة الأغاني والموسيقى اللي بتفكرنا ببعض... أول ما يضيف أغاني في لوحة التحكم هتظهر هنا ونقدر نسمعها سوا 💕
+          {isSafetyMode ? 'قائمة الأغاني الخاصة بتجهّز... أول ما تتضاف هتظهر هنا ونقدر نسمعها سوا 💕' : `${hisNickname} بيجهّز قائمة الأغاني والموسيقى اللي بتفكرنا ببعض... أول ما يضيف أغاني في لوحة التحكم هتظهر هنا ونقدر نسمعها سوا 💕`}
         </p>
       </section>
     );
@@ -199,7 +201,7 @@ export default function MusicSection({
             {currentTrack.title}
           </h4>
           <p className="text-[11px] text-[#7A5B61] font-medium mb-3">
-            {currentTrack.artist || `${hisNickname} & Jojo`}
+            {currentTrack.artist || (isSafetyMode ? 'Our Soundtrack 💕' : `${hisNickname} & Jojo`)}
           </p>
 
           {/* Time scrubber */}
@@ -308,7 +310,7 @@ export default function MusicSection({
                       </span>
                       <div className="min-w-0">
                         <p className="text-xs truncate">{t.title}</p>
-                        <p className="text-[10px] text-[#7A5B61] truncate">{t.artist || 'Bibo & Jojo'}</p>
+                        <p className="text-[10px] text-[#7A5B61] truncate">{t.artist || (isSafetyMode ? 'Our Soundtrack 💕' : 'Bibo & Jojo')}</p>
                       </div>
                     </div>
                     {isSelected && isPlaying && (

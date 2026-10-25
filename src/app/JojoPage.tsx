@@ -4,11 +4,12 @@ import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Home, Lock, Mail, Camera, Heart, ChevronDown, Send, Clock, Sparkles,
-  Plus, Upload, RotateCw, Check, X,
+  Plus, Upload, RotateCw, Check, X, Shield, ShieldCheck,
 } from 'lucide-react';
 import { usePortal } from '@/lib/PortalProvider';
 import { uploadFileDetailed, BUCKETS, isSupabaseConfigured, compressImage, getSupabase, resolveSupabaseCloud } from '@/lib/supabase';
 import { generateUUID, type Memory } from '@/lib/types';
+import { createNameMasker } from '@/lib/safety';
 import ParticleBackground from '@/components/ParticleBackground';
 import MusicPlayer from '@/components/MusicPlayer';
 import CountdownDisplay from '@/components/CountdownDisplay';
@@ -24,11 +25,88 @@ export default function JojoPage() {
   const { state, sendSignal, upsertMemory, upsertAsset } = usePortal();
   const { settings, events, envelopes, tracks, memories } = state;
 
+  // ── Safety Mode State (Hides his name/nickname & her name/nickname across the web)
+  const [isSafetyMode, setIsSafetyMode] = useState<boolean>(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        return localStorage.getItem('jojo_safety_mode') === 'true';
+      } catch {
+        return false;
+      }
+    }
+    return false;
+  });
+  const [showSafetyToast, setShowSafetyToast] = useState(false);
+
+  const toggleSafetyMode = () => {
+    setIsSafetyMode((prev) => {
+      const next = !prev;
+      try {
+        localStorage.setItem('jojo_safety_mode', String(next));
+      } catch { /* ignore */ }
+      setShowSafetyToast(true);
+      setTimeout(() => setShowSafetyToast(false), 2400);
+      return next;
+    });
+  };
+
+  const mask = createNameMasker(settings);
+
+  // Dynamic Browser Tab Title (Masked when in safety mode)
+  useEffect(() => {
+    if (typeof document !== 'undefined') {
+      if (isSafetyMode) {
+        document.title = 'Personal Space 📝';
+      } else {
+        document.title = settings.portal_title || `${settings.his_nickname || 'Bibo'} & ${settings.her_nickname || 'Jojo'} ✨`;
+      }
+    }
+  }, [isSafetyMode, settings.portal_title, settings.his_nickname, settings.her_nickname]);
+
+  const displayHisNick = isSafetyMode ? '••••' : (settings.his_nickname || 'Bibo');
+  const displayHerNick = isSafetyMode ? '••••' : (settings.her_nickname || 'Jojo');
+  const displayPortalTitle = isSafetyMode ? 'Our Space ✨' : (settings.portal_title || `${displayHisNick} & ${displayHerNick} ✨`);
+  const displayDailyNoteTitle = isSafetyMode ? 'Daily Note 💌 :' : mask(settings.daily_note_title || `Daily Note from ${displayHisNick} 💌 :`);
+  const displayDailyNoteContent = isSafetyMode ? mask(settings.daily_note_content) : settings.daily_note_content;
+
   // ── Pre-flight Database Gatekeeper Algorithm ────────────────────────────────
   // Prevents rendering any page components until the database lock status is verified!
   const [gatekeeperStatus, setGatekeeperStatus] = useState<'checking' | 'locked' | 'unlocked'>('checking');
   const [liveLockMsg, setLiveLockMsg] = useState(settings.lock_message || 'بعمل update علي السريع يا كتكوتي ');
   const [bypassUnlocked] = useState(false);
+
+  const displayLockMsg = isSafetyMode ? mask(liveLockMsg) : liveLockMsg;
+
+  // Safe data collections with names masked in safety mode
+  const safeEvents = events.map(evt => ({
+    ...evt,
+    title: isSafetyMode ? mask(evt.title) : evt.title,
+    subtitle: isSafetyMode ? mask(evt.subtitle) : evt.subtitle,
+    teaser_clue: isSafetyMode ? mask(evt.teaser_clue) : evt.teaser_clue,
+    vault_letter: isSafetyMode ? mask(evt.vault_letter) : evt.vault_letter,
+    vault_media: (evt.vault_media || []).map(m => ({
+      ...m,
+      caption: isSafetyMode ? mask(m.caption) : m.caption,
+    })),
+  }));
+
+  const safeEnvelopes = envelopes.map(env => ({
+    ...env,
+    title: isSafetyMode ? mask(env.title) : env.title,
+    letter_content: isSafetyMode ? mask(env.letter_content) : env.letter_content,
+  }));
+
+  const safeMemories = memories.map(mem => ({
+    ...mem,
+    title: isSafetyMode ? mask(mem.title) : mem.title,
+    caption: mem.caption ? (isSafetyMode ? mask(mem.caption) : mem.caption) : null,
+  }));
+
+  const safeTracks = tracks.map(tr => ({
+    ...tr,
+    title: isSafetyMode ? mask(tr.title) : tr.title,
+    artist: isSafetyMode ? (tr.artist ? mask(tr.artist) : 'Our Soundtrack 💕') : tr.artist,
+  }));
 
   const [activeTab, setActiveTab] = useState<TabId>('home');
   const [showTogetherDetail, setShowTogetherDetail] = useState(false);
@@ -50,8 +128,8 @@ export default function JojoPage() {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   // Find featured event or fallback to first
-  const featuredEvent = events.find(e => e.is_featured) || events[0] || null;
-  const selectedEvent = (selectedEventId ? events.find(e => e.id === selectedEventId) : null) || featuredEvent || null;
+  const featuredEvent = safeEvents.find(e => e.is_featured) || safeEvents[0] || null;
+  const selectedEvent = (selectedEventId ? safeEvents.find(e => e.id === selectedEventId) : null) || featuredEvent || null;
 
   // Format relationship start date dynamically
   const startDate = new Date(settings.relationship_start);
@@ -156,7 +234,12 @@ export default function JojoPage() {
     };
   }, [settings.is_locked, settings.lock_message]);
 
-  const quickSignals = [
+  const quickSignals = isSafetyMode ? [
+    'Missing You ❤️',
+    'Thinking of you ✨',
+    'Wish you were here 🥺',
+    'I love you 💕',
+  ] : [
     `Missing ${settings.his_nickname || 'Bibo'} ❤️`,
     `Thinking of you ${settings.his_nickname || 'Bibo'} ✨`,
     'Wish you were here 🥺',
@@ -245,7 +328,9 @@ export default function JojoPage() {
       // Notify Bibo live
       await sendSignal({
         signal_type: 'camera',
-        message: `${settings.her_nickname || 'Jojo'} added a new memory: "${newMemory.title}" 📷💕`,
+        message: isSafetyMode
+          ? `A new memory was added to our timeline: "${newMemory.title}" 📷💕`
+          : `${settings.her_nickname || 'Jojo'} added a new memory: "${newMemory.title}" 📷💕`,
       });
 
       setMemSaveSuccess(true);
@@ -286,7 +371,7 @@ export default function JojoPage() {
           💖
         </motion.div>
         <h1 className="text-xl font-bold tracking-tight mb-2 text-[#44292E]">
-          {settings.portal_title || 'Our Space ✨'}
+          {displayPortalTitle}
         </h1>
         <p className="text-xs text-[#7A5B61] font-medium animate-pulse" dir="auto">
           جاري التحميل والتأكد من أحدث المفاجآت... 💕
@@ -305,6 +390,76 @@ export default function JojoPage() {
           fontFamily: `'Cairo', 'Playfair Display', sans-serif`,
         }}
       >
+        {/* Floating Safety Button on Lock Screen */}
+        <div className="fixed top-3 left-3 z-50 select-none">
+          <motion.button
+            whileHover={{ scale: 1.04 }}
+            whileTap={{ scale: 0.94 }}
+            onClick={toggleSafetyMode}
+            title={isSafetyMode ? "Safety Button Active: Names hidden. Click to restore." : "Safety Button: Click to hide all names and nicknames."}
+            className="rounded-2xl p-1.5 px-3 shadow-md flex items-center gap-2 backdrop-blur-xl border transition-all cursor-pointer"
+            style={{
+              background: isSafetyMode ? 'rgba(236, 253, 245, 0.94)' : 'rgba(255, 255, 255, 0.85)',
+              borderColor: isSafetyMode ? 'rgba(52, 211, 153, 0.8)' : 'rgba(255, 255, 255, 0.9)',
+              boxShadow: isSafetyMode ? '0 8px 24px rgba(16, 185, 129, 0.25)' : '0 8px 24px rgba(212, 140, 150, 0.22)',
+            }}
+          >
+            <div
+              className={`w-7 h-7 rounded-xl flex items-center justify-center transition-colors shadow-2xs ${
+                isSafetyMode ? 'bg-emerald-500 text-white' : 'bg-rose-100/90 text-rose-600'
+              }`}
+            >
+              {isSafetyMode ? <ShieldCheck size={16} /> : <Shield size={16} />}
+            </div>
+
+            <div className="flex flex-col text-left">
+              <div className="flex items-center gap-1.5">
+                <span
+                  className={`text-[11px] font-bold tracking-tight transition-colors ${
+                    isSafetyMode ? 'text-emerald-900' : 'text-[#44292E]'
+                  }`}
+                >
+                  {isSafetyMode ? 'Safety: Active' : 'Safety Button'}
+                </span>
+                {isSafetyMode && (
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping" />
+                )}
+              </div>
+              <span
+                className={`text-[9px] font-medium leading-none ${
+                  isSafetyMode ? 'text-emerald-700' : 'text-[#8C6B72]'
+                }`}
+              >
+                {isSafetyMode ? 'Names Hidden' : 'Hide Names'}
+              </span>
+            </div>
+          </motion.button>
+        </div>
+
+        {/* Floating Toast Notification */}
+        <AnimatePresence>
+          {showSafetyToast && (
+            <motion.div
+              initial={{ opacity: 0, y: -10, scale: 0.95 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: -10, scale: 0.95 }}
+              className="fixed top-16 left-3 z-50 rounded-2xl px-3.5 py-2 text-xs font-semibold shadow-xl border backdrop-blur-md flex items-center gap-2"
+              style={{
+                background: isSafetyMode ? 'rgba(236, 253, 245, 0.95)' : 'rgba(255, 245, 247, 0.95)',
+                borderColor: isSafetyMode ? '#34D399' : '#F472B6',
+                color: isSafetyMode ? '#065F46' : '#831843',
+              }}
+            >
+              <span>{isSafetyMode ? '🛡️' : '✨'}</span>
+              <span>
+                {isSafetyMode
+                  ? 'Safety Button Active: All names & nicknames hidden'
+                  : 'Safety Button Off: Names and nicknames restored'}
+              </span>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
         {/* Soft background ambient floating decor */}
         <div className="absolute inset-0 pointer-events-none opacity-40 select-none">
           <div className="absolute top-10 left-10 text-2xl animate-bounce">✨</div>
@@ -358,7 +513,7 @@ export default function JojoPage() {
             className="text-xl md:text-2xl font-bold leading-relaxed mb-3 text-[#44292E]"
             dir="auto"
           >
-            {liveLockMsg || settings.lock_message || 'بعمل update علي السريع يا كتكوتي '}
+            {displayLockMsg || 'بعمل update علي السريع يا كتكوتي '}
           </h2>
 
           <p className="text-xs text-[#7A5B61] leading-relaxed mb-6 font-medium" dir="auto">
@@ -376,7 +531,7 @@ export default function JojoPage() {
 
           <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-rose-50 text-[11px] text-rose-600 font-semibold border border-rose-100 shadow-2xs">
             <Sparkles size={12} className="animate-spin text-rose-500" />
-            <span>{settings.his_nickname || 'Bibo'} شغال عليها دلوقتي حالا ✨</span>
+            <span>{isSafetyMode ? 'جاري العمل عليها دلوقتي حالا ✨' : `${displayHisNick} شغال عليها دلوقتي حالا ✨`}</span>
           </div>
 
           {/* Live auto-unlock note */}
@@ -400,8 +555,78 @@ export default function JojoPage() {
       {/* Dynamic Particle atmosphere layer */}
       <ParticleBackground effect={settings.particle_effect || 'sakura'} accentColor={settings.accent_color} />
 
+      {/* Floating Safety Button pill in top left */}
+      <div className="fixed top-3 left-3 z-40 select-none">
+        <motion.button
+          whileHover={{ scale: 1.04 }}
+          whileTap={{ scale: 0.94 }}
+          onClick={toggleSafetyMode}
+          title={isSafetyMode ? "Safety Button Active: Names hidden. Click to restore." : "Safety Button: Click to hide all names and nicknames."}
+          className="rounded-2xl p-1.5 px-3 shadow-md flex items-center gap-2 backdrop-blur-xl border transition-all cursor-pointer"
+          style={{
+            background: isSafetyMode ? 'rgba(236, 253, 245, 0.94)' : 'rgba(255, 255, 255, 0.78)',
+            borderColor: isSafetyMode ? 'rgba(52, 211, 153, 0.8)' : 'rgba(255, 255, 255, 0.85)',
+            boxShadow: isSafetyMode ? '0 8px 24px rgba(16, 185, 129, 0.25)' : '0 8px 24px rgba(212, 140, 150, 0.22)',
+          }}
+        >
+          <div
+            className={`w-7 h-7 rounded-xl flex items-center justify-center transition-colors shadow-2xs ${
+              isSafetyMode ? 'bg-emerald-500 text-white' : 'bg-rose-100/90 text-rose-600'
+            }`}
+          >
+            {isSafetyMode ? <ShieldCheck size={16} /> : <Shield size={16} />}
+          </div>
+
+          <div className="flex flex-col text-left">
+            <div className="flex items-center gap-1.5">
+              <span
+                className={`text-[11px] font-bold tracking-tight transition-colors ${
+                  isSafetyMode ? 'text-emerald-900' : 'text-[#44292E]'
+                }`}
+              >
+                {isSafetyMode ? 'Safety: Active' : 'Safety Button'}
+              </span>
+              {isSafetyMode && (
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping" />
+              )}
+            </div>
+            <span
+              className={`text-[9px] font-medium leading-none ${
+                isSafetyMode ? 'text-emerald-700' : 'text-[#8C6B72]'
+              }`}
+            >
+              {isSafetyMode ? 'Names Hidden' : 'Hide Names'}
+            </span>
+          </div>
+        </motion.button>
+      </div>
+
+      {/* Floating Toast Notification */}
+      <AnimatePresence>
+        {showSafetyToast && (
+          <motion.div
+            initial={{ opacity: 0, y: -10, scale: 0.95 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -10, scale: 0.95 }}
+            className="fixed top-16 left-3 z-50 rounded-2xl px-3.5 py-2 text-xs font-semibold shadow-xl border backdrop-blur-md flex items-center gap-2"
+            style={{
+              background: isSafetyMode ? 'rgba(236, 253, 245, 0.95)' : 'rgba(255, 245, 247, 0.95)',
+              borderColor: isSafetyMode ? '#34D399' : '#F472B6',
+              color: isSafetyMode ? '#065F46' : '#831843',
+            }}
+          >
+            <span>{isSafetyMode ? '🛡️' : '✨'}</span>
+            <span>
+              {isSafetyMode
+                ? 'Safety Button Active: All names & nicknames hidden'
+                : 'Safety Button Off: Names and nicknames restored'}
+            </span>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* Floating Music Player pill in top right */}
-      <MusicPlayer tracks={tracks} accentColor={settings.accent_color} />
+      <MusicPlayer tracks={safeTracks} accentColor={settings.accent_color} />
 
       {/* ─────────────────────────────────────────────────────────────
           PORTAL LOCK OVERLAY (When Bibo locks her page)
@@ -464,7 +689,7 @@ export default function JojoPage() {
                 style={{ fontFamily: "'Cairo', 'Playfair Display', sans-serif" }}
                 dir="auto"
               >
-                {settings.lock_message || 'بعمل update علي السريع يا كتكوتي '}
+                {displayLockMsg || 'بعمل update علي السريع يا كتكوتي '}
               </h2>
 
               <p className="text-xs text-[#7A5B61] leading-relaxed mb-5 font-medium" dir="auto">
@@ -482,7 +707,7 @@ export default function JojoPage() {
 
               <div className="inline-flex items-center gap-1.5 px-3.5 py-1 rounded-full bg-rose-50 text-[11px] text-rose-500 font-medium border border-rose-100">
                 <Sparkles size={11} className="animate-spin" />
-                <span>{settings.his_nickname || 'Bibo'} شغال عليها دلوقتي حالا ✨</span>
+                <span>{isSafetyMode ? 'جاري العمل عليها دلوقتي حالا ✨' : `${displayHisNick} شغال عليها دلوقتي حالا ✨`}</span>
               </div>
             </motion.div>
           </motion.div>
@@ -494,7 +719,7 @@ export default function JojoPage() {
 
         {/* ─────────────────────────────────────────────────────────────
             TAB 1: HOME VIEW
-           ───────────────────────────────────────────────────────────── */}
+            ───────────────────────────────────────────────────────────── */}
         {activeTab === 'home' && (
           <motion.div
             initial={{ opacity: 0, y: 10 }}
@@ -511,7 +736,7 @@ export default function JojoPage() {
                   color: settings.text_primary || '#44292E',
                 }}
               >
-                {settings.portal_title || `${settings.his_nickname || 'Bibo'} & ${settings.her_nickname || 'Jojo'}`} <span className="text-amber-400 text-lg">✨</span>
+                {displayPortalTitle} <span className="text-amber-400 text-lg">✨</span>
               </h1>
               {formattedTogetherDate && (
                 <button
@@ -569,7 +794,7 @@ export default function JojoPage() {
                   className="text-xs font-semibold"
                   style={{ color: settings.text_primary || '#44292E' }}
                 >
-                  {settings.daily_note_title || `Daily Note 💌 :`}
+                  {displayDailyNoteTitle}
                 </span>
                 {settings.daily_note_updated_at && (
                   <ClientDate
@@ -583,7 +808,7 @@ export default function JojoPage() {
                 style={{ color: settings.text_primary || '#44292E' }}
                 dir="auto"
               >
-                {settings.daily_note_content || `No note for today yet. Check back soon! 💕`}
+                {displayDailyNoteContent || `No note for today yet. Check back soon! 💕`}
               </p>
             </section>
 
@@ -602,9 +827,9 @@ export default function JojoPage() {
                   label={selectedEvent.title}
                   accentColor={settings.accent_color}
                   switcher={
-                    events.length > 1 ? (
+                    safeEvents.length > 1 ? (
                       <div className="flex gap-1.5 flex-wrap justify-center">
-                        {events.map((evt) => (
+                        {safeEvents.map((evt) => (
                           <button
                             key={evt.id}
                             onClick={() => setSelectedEventId(evt.id)}
@@ -647,15 +872,21 @@ export default function JojoPage() {
             {/* Card 3: Digital Vault */}
             {selectedEvent && (
               <section>
-                <VaultCard event={selectedEvent} accentColor={settings.accent_color} />
+                <VaultCard
+                  event={selectedEvent}
+                  accentColor={settings.accent_color}
+                  hisNickname={displayHisNick}
+                  isSafetyMode={isSafetyMode}
+                />
               </section>
             )}
 
             {/* Card 4: Our Songs & Soundtrack */}
             <MusicSection
-              tracks={tracks}
+              tracks={safeTracks}
               accentColor={settings.accent_color}
-              hisNickname={settings.his_nickname || 'Bibo'}
+              hisNickname={displayHisNick}
+              isSafetyMode={isSafetyMode}
             />
           </motion.div>
         )}
@@ -681,7 +912,7 @@ export default function JojoPage() {
                 Digital Vault <span className="text-amber-400 text-lg">✨</span>
               </h1>
               <p className="text-xs text-[#7A5B61] mt-0.5">
-                Special surprises and locked letters prepared by {settings.his_nickname || 'Bibo'}
+                Special surprises and locked letters prepared {isSafetyMode ? 'with love ✨' : `by ${displayHisNick}`}
               </p>
             </header>
 
@@ -701,9 +932,9 @@ export default function JojoPage() {
                     label={selectedEvent.title}
                     accentColor={settings.accent_color}
                     switcher={
-                      events.length > 1 ? (
+                      safeEvents.length > 1 ? (
                         <div className="flex gap-1.5 flex-wrap justify-center mt-2">
-                          {events.map((evt) => (
+                          {safeEvents.map((evt) => (
                             <button
                               key={evt.id}
                               onClick={() => setSelectedEventId(evt.id)}
@@ -727,7 +958,12 @@ export default function JojoPage() {
 
                 {/* Vault Content Card */}
                 <section>
-                  <VaultCard event={selectedEvent} accentColor={settings.accent_color} />
+                  <VaultCard
+                    event={selectedEvent}
+                    accentColor={settings.accent_color}
+                    hisNickname={displayHisNick}
+                    isSafetyMode={isSafetyMode}
+                  />
                 </section>
               </>
             ) : (
@@ -772,15 +1008,15 @@ export default function JojoPage() {
                 Open When Envelopes
               </h1>
               <p className="text-sm text-[#C47D88] font-script mt-0.5 font-bold">
-                For {settings.her_nickname || 'Jojo'} 💕
+                For {isSafetyMode ? 'You' : displayHerNick} 💕
               </p>
             </header>
 
             {/* Envelopes 2-column Grid */}
             <section className="space-y-3">
-              {envelopes.length > 0 ? (
+              {safeEnvelopes.length > 0 ? (
                 <div className="grid grid-cols-2 gap-3">
-                  {envelopes.map((env) => (
+                  {safeEnvelopes.map((env) => (
                     <EnvelopeCard
                       key={env.id}
                       envelope={env}
@@ -804,7 +1040,7 @@ export default function JojoPage() {
                   </div>
                   <h3 className="text-sm font-semibold text-[#44292E]">No Envelopes Yet</h3>
                   <p className="text-xs text-[#7A5B61] mt-1 max-w-xs mx-auto">
-                    When envelopes are created in Host Studio, they will appear here as &ldquo;Open When...&rdquo; letters for {settings.her_nickname || 'Jojo'} 💕
+                    When envelopes are created in Host Studio, they will appear here as &ldquo;Open When...&rdquo; letters for {isSafetyMode ? 'You' : displayHerNick} 💕
                   </p>
                 </div>
               )}
@@ -853,7 +1089,7 @@ export default function JojoPage() {
             </header>
 
             <section>
-              <MemoryLane memories={memories} accentColor={settings.accent_color} onAddMemory={() => setShowAddMemory(true)} />
+              <MemoryLane memories={safeMemories} accentColor={settings.accent_color} onAddMemory={() => setShowAddMemory(true)} />
             </section>
           </motion.div>
         )}
@@ -899,7 +1135,7 @@ export default function JojoPage() {
                       </h3>
                     </div>
                     <p className="text-xs text-[#8C6B72] mt-0.5">
-                      Save a moment with {settings.his_nickname || 'Bibo'} to our timeline 💕
+                      Save a moment {isSafetyMode ? 'with love' : `with ${displayHisNick}`} to our timeline 💕
                     </p>
                   </div>
                   <button
@@ -1062,7 +1298,7 @@ export default function JojoPage() {
                       className="p-3 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-medium flex items-center justify-center gap-2"
                     >
                       <span>✨</span>
-                      <span>Saved to our Memory Lane! {settings.his_nickname || 'Bibo'} can see it too 💕</span>
+                      <span>Saved to our Memory Lane! {isSafetyMode ? 'Cherished forever 💕' : `${displayHisNick} can see it too 💕`}</span>
                     </motion.div>
                   )}
 
@@ -1131,7 +1367,7 @@ export default function JojoPage() {
                     className="text-base font-bold text-[#44292E]"
                     style={{ fontFamily: `'${settings.heading_font || 'Playfair Display'}', serif` }}
                   >
-                    Ping {settings.his_nickname || 'Bibo'} ❤️
+                    Ping {isSafetyMode ? 'Special Someone' : displayHisNick} ❤️
                   </h3>
                   <button
                     onClick={() => setActiveTab('home')}
@@ -1142,7 +1378,7 @@ export default function JojoPage() {
                 </div>
 
                 <p className="text-xs text-[#7A5B61] mb-3">
-                  Send a love signal right to {settings.his_nickname || 'Bibo'}&apos;s Studio:
+                  Send a love signal right to {isSafetyMode ? 'the Studio' : `${displayHisNick}'s Studio`}:
                 </p>
 
                 <div className="grid grid-cols-2 gap-2 mb-3">
@@ -1167,7 +1403,7 @@ export default function JojoPage() {
                     value={pingMessage}
                     onChange={(e) => setPingMessage(e.target.value)}
                     onKeyDown={(e) => e.key === 'Enter' && pingMessage && handleSendPing(pingMessage)}
-                    placeholder={`Write a custom note to ${settings.his_nickname || 'Bibo'}...`}
+                    placeholder={`Write a custom note ${isSafetyMode ? 'with love' : `to ${displayHisNick}`}...`}
                     dir="auto"
                     className="flex-1 px-3 py-2 rounded-xl text-xs bg-white/90 border border-pink-200 outline-none text-[#44292E]"
                   />
@@ -1186,7 +1422,7 @@ export default function JojoPage() {
                     animate={{ opacity: 1, y: 0 }}
                     className="text-xs mt-2 text-center text-pink-600 font-medium"
                   >
-                    ✨ Love signal sent to {settings.his_nickname || 'Bibo'}! He&apos;ll see it right now 💕
+                    ✨ Love signal sent {isSafetyMode ? 'successfully' : `to ${displayHisNick}`}! He&apos;ll see it right now 💕
                   </motion.p>
                 )}
               </motion.div>
@@ -1200,7 +1436,7 @@ export default function JojoPage() {
             href="/host"
             className="inline-flex items-center gap-1.5 text-[11px] text-[#44292E]/40 hover:text-[#44292E]/80 transition-colors px-3 py-1.5 rounded-full hover:bg-white/40"
           >
-            <span>🔒</span> {settings.his_nickname || 'Bibo'}&apos;s Host Studio
+            <span>🔒</span> {isSafetyMode ? 'Host Studio' : `${displayHisNick}'s Host Studio`}
             {!isSupabaseConfigured && (
               <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-amber-500/15 text-amber-800 border border-amber-300 font-medium" title="This device is in local demo mode. Tap to connect Supabase database.">
                 ⚡ Offline Mode (Tap to Connect)

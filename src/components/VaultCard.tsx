@@ -9,9 +9,11 @@ import type { EventVault } from '@/lib/types';
 interface VaultCardProps {
   event: EventVault;
   accentColor: string;
+  hisNickname?: string;
+  isSafetyMode?: boolean;
 }
 
-export default function VaultCard({ event, accentColor }: VaultCardProps) {
+export default function VaultCard({ event, accentColor, hisNickname = 'Bibo', isSafetyMode = false }: VaultCardProps) {
   const [unlocked, setUnlocked] = useState(false);
   const [isSimulated, setIsSimulated] = useState(false);
   const [isPlayingAudio, setIsPlayingAudio] = useState(false);
@@ -298,7 +300,9 @@ export default function VaultCard({ event, accentColor }: VaultCardProps) {
       >
         <div className="flex items-center justify-center gap-1.5 mb-1 text-[#8C4A55]">
           <Gift size={14} />
-          <span className="text-[11px] font-bold uppercase tracking-wider">Love Coupon from Bibo</span>
+          <span className="text-[11px] font-bold uppercase tracking-wider">
+            Love Coupon {isSafetyMode ? 'For You' : `from ${hisNickname || 'Bibo'}`}
+          </span>
         </div>
         <h4 className="text-base font-bold text-[#44292E] font-script">
           Redeemable: One Lifetime of Unconditional Love & Hugs
