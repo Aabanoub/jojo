@@ -387,13 +387,13 @@ export default function HostPage() {
     const envelope: OpenWhenEnvelope = editEnvId
       ? { ...(envelopes.find(e => e.id === editEnvId)!), ...envForm }
       : {
-          id: `env-${Date.now()}`,
-          ...envForm,
-          media_url: null,
-          audio_url: null,
-          sort_order: envelopes.length + 1,
-          created_at: new Date().toISOString(),
-        };
+        id: `env-${Date.now()}`,
+        ...envForm,
+        media_url: null,
+        audio_url: null,
+        sort_order: envelopes.length + 1,
+        created_at: new Date().toISOString(),
+      };
     await doSave('envelope', () => upsertEnvelope(envelope));
     setEnvForm({ title: '', emoji: '💌', letter_content: '', requires_password: false });
     setEditEnvId(null);
@@ -456,12 +456,12 @@ export default function HostPage() {
     const track: PlaylistTrack = editTrackId
       ? { ...(tracks.find(t => t.id === editTrackId)!), ...trackForm }
       : {
-          id: generateUUID(),
-          ...trackForm,
-          cover_url: null,
-          sort_order: tracks.length + 1,
-          created_at: new Date().toISOString(),
-        };
+        id: generateUUID(),
+        ...trackForm,
+        cover_url: null,
+        sort_order: tracks.length + 1,
+        created_at: new Date().toISOString(),
+      };
     await doSave('track', async () => {
       const res = await upsertTrack(track);
       if (res && !res.success) {
@@ -488,11 +488,11 @@ export default function HostPage() {
     const mem: Memory = editMemId
       ? { ...(memories.find(m => m.id === editMemId)!), ...memForm }
       : {
-          id: generateUUID(),
-          ...memForm,
-          sort_order: memories.length + 1,
-          created_at: new Date().toISOString(),
-        };
+        id: generateUUID(),
+        ...memForm,
+        sort_order: memories.length + 1,
+        created_at: new Date().toISOString(),
+      };
     await doSave('memory', async () => {
       const res = await upsertMemory(mem);
       if (res && !res.success && res.error) {
@@ -611,29 +611,29 @@ export default function HostPage() {
     const existing = editEvtId ? events.find(e => e.id === editEvtId) : null;
     const evt: EventVault = existing
       ? {
-          ...existing,
-          title: evtForm.title.trim(),
-          target_date: cleanDate,
-          teaser_clue: evtForm.teaser_clue,
-          vault_letter: evtForm.vault_letter,
-          subtitle: evtForm.subtitle || existing.subtitle || '',
-          is_featured: evtForm.is_featured,
-          unlock_method: evtForm.unlock_method,
-        }
+        ...existing,
+        title: evtForm.title.trim(),
+        target_date: cleanDate,
+        teaser_clue: evtForm.teaser_clue,
+        vault_letter: evtForm.vault_letter,
+        subtitle: evtForm.subtitle || existing.subtitle || '',
+        is_featured: evtForm.is_featured,
+        unlock_method: evtForm.unlock_method,
+      }
       : {
-          id: newId,
-          title: evtForm.title.trim(),
-          subtitle: evtForm.subtitle || '',
-          target_date: cleanDate,
-          is_featured: evtForm.is_featured,
-          unlock_method: evtForm.unlock_method,
-          event_password: settings.master_password,
-          force_unlocked: false,
-          teaser_clue: evtForm.teaser_clue || '',
-          vault_letter: evtForm.vault_letter,
-          vault_media: [],
-          created_at: new Date().toISOString(),
-        };
+        id: newId,
+        title: evtForm.title.trim(),
+        subtitle: evtForm.subtitle || '',
+        target_date: cleanDate,
+        is_featured: evtForm.is_featured,
+        unlock_method: evtForm.unlock_method,
+        event_password: settings.master_password,
+        force_unlocked: false,
+        teaser_clue: evtForm.teaser_clue || '',
+        vault_letter: evtForm.vault_letter,
+        vault_media: [],
+        created_at: new Date().toISOString(),
+      };
 
     await doSave('event', () => upsertEvent(evt));
     setEvtForm({
@@ -698,11 +698,11 @@ export default function HostPage() {
   // ── NAV ITEMS ────────────────────────────────────────────────────────────────
   const navItems: { id: NavTab; icon: React.ElementType; label: string }[] = [
     { id: 'dashboard', icon: LayoutDashboard, label: 'Dashboard' },
-    { id: 'theme',     icon: Palette,         label: 'Theme Studio' },
-    { id: 'events',    icon: Lock,            label: 'Event Vault' },
-    { id: 'media',     icon: ImageIcon,       label: 'Media & Memory' },
-    { id: 'music',     icon: Music,           label: 'Music & Notes' },
-    { id: 'settings',  icon: Settings,        label: 'Settings' },
+    { id: 'theme', icon: Palette, label: 'Theme Studio' },
+    { id: 'events', icon: Lock, label: 'Event Vault' },
+    { id: 'media', icon: ImageIcon, label: 'Media & Memory' },
+    { id: 'music', icon: Music, label: 'Music & Notes' },
+    { id: 'settings', icon: Settings, label: 'Settings' },
   ];
 
   // ── MAIN STUDIO LAYOUT ────────────────────────────────────────────────────────
@@ -814,11 +814,10 @@ export default function HostPage() {
             <button
               onClick={toggleLockJojoPage}
               disabled={saving === 'lock-portal'}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold transition-all shadow-sm cursor-pointer ${
-                settings.is_locked
-                  ? 'bg-rose-500/25 text-rose-300 border border-rose-500/50 animate-pulse hover:bg-rose-500/35'
-                  : 'bg-white/5 text-white/70 border border-white/10 hover:bg-rose-500/15 hover:text-rose-200 hover:border-rose-400/40'
-              }`}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold transition-all shadow-sm cursor-pointer ${settings.is_locked
+                ? 'bg-rose-500/25 text-rose-300 border border-rose-500/50 animate-pulse hover:bg-rose-500/35'
+                : 'bg-white/5 text-white/70 border border-white/10 hover:bg-rose-500/15 hover:text-rose-200 hover:border-rose-400/40'
+                }`}
               title={settings.is_locked ? "Click to unlock Jojo's page" : "Click to lock Jojo's page and write: بعمل update علي السريع يا كتكوتي "}
             >
               {saving === 'lock-portal' ? (
@@ -878,9 +877,8 @@ export default function HostPage() {
                   <button
                     key={tab.id}
                     onClick={() => setActiveNav(tab.id)}
-                    className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-xs font-medium transition-all ${
-                      isActive ? 'text-white border' : 'text-white/50 hover:text-white/80 hover:bg-white/5'
-                    }`}
+                    className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-xs font-medium transition-all ${isActive ? 'text-white border' : 'text-white/50 hover:text-white/80 hover:bg-white/5'
+                      }`}
                     style={isActive ? {
                       background: 'linear-gradient(135deg, rgba(212,140,150,0.35), rgba(180,110,120,0.25))',
                       borderColor: 'rgba(212,140,150,0.45)',
@@ -936,11 +934,10 @@ export default function HostPage() {
 
                       {/* ── Jojo's Page Lock (Maintenance Mode) Card ─────────── */}
                       <div
-                        className={`mt-3 p-4 rounded-xl border transition-all duration-300 ${
-                          settings.is_locked
-                            ? 'bg-rose-950/20 border-rose-500/40 shadow-lg ring-1 ring-rose-500/30'
-                            : 'bg-[#282632] border-white/6 hover:border-white/15'
-                        }`}
+                        className={`mt-3 p-4 rounded-xl border transition-all duration-300 ${settings.is_locked
+                          ? 'bg-rose-950/20 border-rose-500/40 shadow-lg ring-1 ring-rose-500/30'
+                          : 'bg-[#282632] border-white/6 hover:border-white/15'
+                          }`}
                       >
                         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-3">
                           <div className="flex items-start sm:items-center gap-2.5">
@@ -971,11 +968,10 @@ export default function HostPage() {
                           <button
                             onClick={toggleLockJojoPage}
                             disabled={saving === 'lock-portal'}
-                            className={`px-4 py-2 rounded-xl text-xs font-bold transition-all shadow-md active:scale-95 cursor-pointer shrink-0 flex items-center justify-center gap-1.5 ${
-                              settings.is_locked
-                                ? 'bg-gradient-to-r from-emerald-500 to-teal-500 text-white hover:brightness-110'
-                                : 'bg-gradient-to-r from-rose-500 to-pink-500 text-white hover:brightness-110'
-                            }`}
+                            className={`px-4 py-2 rounded-xl text-xs font-bold transition-all shadow-md active:scale-95 cursor-pointer shrink-0 flex items-center justify-center gap-1.5 ${settings.is_locked
+                              ? 'bg-gradient-to-r from-emerald-500 to-teal-500 text-white hover:brightness-110'
+                              : 'bg-gradient-to-r from-rose-500 to-pink-500 text-white hover:brightness-110'
+                              }`}
                           >
                             {saving === 'lock-portal' ? (
                               <RotateCw size={12} className="animate-spin" />
@@ -1017,11 +1013,10 @@ export default function HostPage() {
 
                         {/* Cloud Sync Status & Error Notice */}
                         {lockCloudNotice && (
-                          <div className={`mt-2.5 p-3 rounded-xl text-xs flex items-start gap-2 ${
-                            lockCloudNotice.type === 'error'
-                              ? 'bg-amber-500/15 border border-amber-500/30 text-amber-200'
-                              : 'bg-emerald-500/15 border border-emerald-500/30 text-emerald-200'
-                          }`}>
+                          <div className={`mt-2.5 p-3 rounded-xl text-xs flex items-start gap-2 ${lockCloudNotice.type === 'error'
+                            ? 'bg-amber-500/15 border border-amber-500/30 text-amber-200'
+                            : 'bg-emerald-500/15 border border-emerald-500/30 text-emerald-200'
+                            }`}>
                             {lockCloudNotice.type === 'error' ? (
                               <AlertCircle size={15} className="shrink-0 text-amber-400 mt-0.5" />
                             ) : (
@@ -1035,8 +1030,8 @@ export default function HostPage() {
                                     If Supabase says column does not exist, run this in your Supabase SQL Editor:
                                   </p>
                                   <pre className="text-[9px] bg-black/50 p-2 rounded-lg font-mono text-amber-100 select-all overflow-x-auto">
-ALTER TABLE public.site_settings ADD COLUMN IF NOT EXISTS is_locked boolean NOT NULL DEFAULT false;
-ALTER TABLE public.site_settings ADD COLUMN IF NOT EXISTS lock_message text DEFAULT &apos;بعمل update علي السريع يا كتكوتي &apos;;
+                                    ALTER TABLE public.site_settings ADD COLUMN IF NOT EXISTS is_locked boolean NOT NULL DEFAULT false;
+                                    ALTER TABLE public.site_settings ADD COLUMN IF NOT EXISTS lock_message text DEFAULT &apos;بعمل update علي السريع يا كتكوتي &apos;;
                                   </pre>
                                 </>
                               )}
@@ -1150,11 +1145,10 @@ ALTER TABLE public.site_settings ADD COLUMN IF NOT EXISTS lock_message text DEFA
                       {/* Daily Note Preview & Live Editor */}
                       <div
                         ref={dailyNoteEditorRef}
-                        className={`mt-3 p-3.5 rounded-xl border transition-all duration-300 ${
-                          isEditingDailyNote
-                            ? 'bg-[#282632] border-rose-500/40 ring-1 ring-rose-500/20 shadow-lg'
-                            : 'bg-[#282632] border-white/6 hover:border-white/15'
-                        }`}
+                        className={`mt-3 p-3.5 rounded-xl border transition-all duration-300 ${isEditingDailyNote
+                          ? 'bg-[#282632] border-rose-500/40 ring-1 ring-rose-500/20 shadow-lg'
+                          : 'bg-[#282632] border-white/6 hover:border-white/15'
+                          }`}
                       >
                         <div className="flex items-center justify-between mb-2 pb-1.5 border-b border-white/5">
                           <div className="flex items-center gap-2">
@@ -1383,8 +1377,8 @@ ALTER TABLE public.site_settings ADD COLUMN IF NOT EXISTS lock_message text DEFA
                               filter === 'all'
                                 ? signals.length
                                 : filter === 'from_jojo'
-                                ? signals.filter(s => !s.signal_type?.startsWith('bibo_') && s.signal_type !== 'push_alert').length
-                                : signals.filter(s => s.signal_type?.startsWith('bibo_') || s.signal_type === 'push_alert').length;
+                                  ? signals.filter(s => !s.signal_type?.startsWith('bibo_') && s.signal_type !== 'push_alert').length
+                                  : signals.filter(s => s.signal_type?.startsWith('bibo_') || s.signal_type === 'push_alert').length;
                             const labels = {
                               all: 'All',
                               from_jojo: 'From Jojo 💕',
@@ -1394,11 +1388,10 @@ ALTER TABLE public.site_settings ADD COLUMN IF NOT EXISTS lock_message text DEFA
                               <button
                                 key={filter}
                                 onClick={() => setSignalFilter(filter)}
-                                className={`px-2.5 py-1 rounded-lg transition-all cursor-pointer ${
-                                  signalFilter === filter
-                                    ? 'bg-rose-500/25 text-rose-300 font-semibold border border-rose-500/30'
-                                    : 'text-white/40 hover:text-white/70 hover:bg-white/5'
-                                }`}
+                                className={`px-2.5 py-1 rounded-lg transition-all cursor-pointer ${signalFilter === filter
+                                  ? 'bg-rose-500/25 text-rose-300 font-semibold border border-rose-500/30'
+                                  : 'text-white/40 hover:text-white/70 hover:bg-white/5'
+                                  }`}
                               >
                                 {labels[filter]} ({count})
                               </button>
@@ -1434,8 +1427,8 @@ ALTER TABLE public.site_settings ADD COLUMN IF NOT EXISTS lock_message text DEFA
                               {signalFilter === 'from_jojo'
                                 ? 'No signals from Jojo yet 💕'
                                 : signalFilter === 'from_bibo'
-                                ? 'No signals sent by you yet 💌'
-                                : 'No signals exchanged yet 💕'}
+                                  ? 'No signals sent by you yet 💌'
+                                  : 'No signals exchanged yet 💕'}
                             </p>
                           );
                         }
@@ -1447,18 +1440,16 @@ ALTER TABLE public.site_settings ADD COLUMN IF NOT EXISTS lock_message text DEFA
                               return (
                                 <div
                                   key={sig.id}
-                                  className={`p-3 rounded-xl flex items-start justify-between gap-3 transition-all ${
-                                    isFromBibo
-                                      ? 'bg-[#23202C] border border-rose-500/20'
-                                      : sig.is_read
+                                  className={`p-3 rounded-xl flex items-start justify-between gap-3 transition-all ${isFromBibo
+                                    ? 'bg-[#23202C] border border-rose-500/20'
+                                    : sig.is_read
                                       ? 'bg-[#282632] border border-white/6'
                                       : 'bg-rose-500/10 border border-rose-500/30 ring-1 ring-rose-500/20'
-                                  }`}
+                                    }`}
                                 >
                                   <div className="flex items-start gap-2.5 min-w-0">
-                                    <div className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 text-sm ${
-                                      isFromBibo ? 'bg-purple-500/20 text-purple-300' : 'bg-pink-500/20 text-pink-300'
-                                    }`}>
+                                    <div className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 text-sm ${isFromBibo ? 'bg-purple-500/20 text-purple-300' : 'bg-pink-500/20 text-pink-300'
+                                      }`}>
                                       {isFromBibo ? '💌' : sig.signal_type === 'camera' ? '📷' : '❤️'}
                                     </div>
                                     <div className="min-w-0">
@@ -1612,7 +1603,7 @@ ALTER TABLE public.site_settings ADD COLUMN IF NOT EXISTS lock_message text DEFA
                                 color: settings.particle_effect === ef ? '#F3D9C9' : 'rgba(255,255,255,0.6)',
                               }}
                             >
-                              {{sakura: '🌸 Sakura', sparkles: '✨ Sparkles', hearts: '❤️ Hearts', stars: '⭐ Stars', none: '○ None'}[ef]}
+                              {{ sakura: '🌸 Sakura', sparkles: '✨ Sparkles', hearts: '❤️ Hearts', stars: '⭐ Stars', none: '○ None' }[ef]}
                             </button>
                           ))}
                         </div>
@@ -1624,7 +1615,7 @@ ALTER TABLE public.site_settings ADD COLUMN IF NOT EXISTS lock_message text DEFA
                         ].map(({ label }) => (
                           <div key={label} className="flex items-center justify-between">
                             <span className="text-xs text-white/70">{label}</span>
-                            <Toggle value={true} onChange={() => {}} />
+                            <Toggle value={true} onChange={() => { }} />
                           </div>
                         ))}
                       </div>
@@ -1668,11 +1659,10 @@ ALTER TABLE public.site_settings ADD COLUMN IF NOT EXISTS lock_message text DEFA
                         {events.map((evt) => (
                           <div
                             key={evt.id}
-                            className={`p-3 rounded-xl border flex items-start justify-between gap-2 transition-all ${
-                              evt.is_featured
-                                ? 'bg-amber-500/10 border-amber-400/30 ring-1 ring-amber-400/20'
-                                : 'bg-[#282632] border-white/6'
-                            }`}
+                            className={`p-3 rounded-xl border flex items-start justify-between gap-2 transition-all ${evt.is_featured
+                              ? 'bg-amber-500/10 border-amber-400/30 ring-1 ring-amber-400/20'
+                              : 'bg-[#282632] border-white/6'
+                              }`}
                           >
                             <div className="flex-1 min-w-0">
                               <div className="flex items-center gap-2 mb-0.5">
@@ -1692,11 +1682,10 @@ ALTER TABLE public.site_settings ADD COLUMN IF NOT EXISTS lock_message text DEFA
                               <button
                                 onClick={() => upsertEvent({ ...evt, is_featured: !evt.is_featured })}
                                 title={evt.is_featured ? 'Featured on hero countdown' : 'Click to set as main hero countdown'}
-                                className={`w-6 h-6 rounded-lg flex items-center justify-center transition-colors ${
-                                  evt.is_featured
-                                    ? 'bg-amber-400/20 text-amber-300'
-                                    : 'bg-white/5 text-white/40 hover:text-amber-300 hover:bg-white/10'
-                                }`}
+                                className={`w-6 h-6 rounded-lg flex items-center justify-center transition-colors ${evt.is_featured
+                                  ? 'bg-amber-400/20 text-amber-300'
+                                  : 'bg-white/5 text-white/40 hover:text-amber-300 hover:bg-white/10'
+                                  }`}
                               >
                                 <Star size={11} className={evt.is_featured ? 'fill-amber-300' : ''} />
                               </button>
@@ -2002,11 +1991,10 @@ ALTER TABLE public.site_settings ADD COLUMN IF NOT EXISTS lock_message text DEFA
                                 onClick={() => {
                                   setMemForm(f => ({ ...f, image_url: assetUrl }));
                                 }}
-                                className={`group relative flex flex-col gap-1 p-2 rounded-2xl cursor-pointer transition-all border ${
-                                  isSelected
-                                    ? 'border-rose-400 bg-rose-500/15 ring-2 ring-rose-400/50 shadow-lg'
-                                    : 'border-white/10 bg-[#282632] hover:border-white/30 hover:bg-[#302e3b]'
-                                }`}
+                                className={`group relative flex flex-col gap-1 p-2 rounded-2xl cursor-pointer transition-all border ${isSelected
+                                  ? 'border-rose-400 bg-rose-500/15 ring-2 ring-rose-400/50 shadow-lg'
+                                  : 'border-white/10 bg-[#282632] hover:border-white/30 hover:bg-[#302e3b]'
+                                  }`}
                               >
                                 <div className="rounded-xl overflow-hidden h-28 relative">
                                   <img src={assetUrl} alt={assetName} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
@@ -2031,20 +2019,20 @@ ALTER TABLE public.site_settings ADD COLUMN IF NOT EXISTS lock_message text DEFA
                                         navigator.clipboard.writeText(assetUrl);
                                         alert(`Copied link to clipboard: ${assetUrl}`);
                                       }}
-                                      className="opacity-0 group-hover:opacity-100 transition-opacity p-1 hover:text-rose-400 text-white/40"
+                                      className="opacity-80 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity p-1.5 sm:p-1 hover:text-rose-400 text-white/50 cursor-pointer"
                                       title="Copy Path"
                                     >
-                                      <Copy size={11} />
+                                      <Copy size={12} />
                                     </button>
                                     <button
                                       onClick={(e) => {
                                         e.stopPropagation();
                                         handleDeleteAsset(img.id || assetUrl);
                                       }}
-                                      className="opacity-0 group-hover:opacity-100 transition-opacity p-1 text-red-400/60 hover:text-red-400 hover:bg-red-500/15 rounded"
+                                      className="opacity-80 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity p-1.5 sm:p-1 text-red-400/80 hover:text-red-400 hover:bg-red-500/15 rounded cursor-pointer"
                                       title="Delete Photo from Library and Database"
                                     >
-                                      <Trash2 size={11} />
+                                      <Trash2 size={12} />
                                     </button>
                                   </div>
                                 </div>
@@ -2221,28 +2209,27 @@ ALTER TABLE public.site_settings ADD COLUMN IF NOT EXISTS lock_message text DEFA
                     <div className="md:col-span-2">
                       <Panel title="Cloud Database & Multi-Device Sync" sub="Supabase Realtime Sync">
                         <div className="space-y-4">
-                          <div className={`p-4 rounded-xl border flex flex-col md:flex-row items-start md:items-center justify-between gap-3 ${
-                            cloudStatus.isConnected
-                              ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-200'
-                              : cloudStatus.isConfigured
+                          <div className={`p-4 rounded-xl border flex flex-col md:flex-row items-start md:items-center justify-between gap-3 ${cloudStatus.isConnected
+                            ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-200'
+                            : cloudStatus.isConfigured
                               ? 'bg-amber-500/10 border-amber-500/30 text-amber-200'
                               : 'bg-rose-500/10 border-rose-500/30 text-rose-200'
-                          }`}>
+                            }`}>
                             <div>
                               <p className="text-xs font-semibold flex items-center gap-2">
                                 <Globe size={14} />
                                 {cloudStatus.isConnected
                                   ? '🟢 Multi-Device Realtime Sync is LIVE'
                                   : cloudStatus.isConfigured
-                                  ? '🟡 Connecting to Supabase Cloud...'
-                                  : '🔴 Local Storage Mode (Not Synced Across Devices)'}
+                                    ? '🟡 Connecting to Supabase Cloud...'
+                                    : '🔴 Local Storage Mode (Not Synced Across Devices)'}
                               </p>
                               <p className="text-[11px] opacity-80 mt-1">
                                 {cloudStatus.isConnected
                                   ? `All changes made in Bibo's Studio sync instantly to Jojo's phone via Supabase. (Last synced: ${cloudStatus.lastSynced ? cloudStatus.lastSynced.toLocaleTimeString() : 'just now'})`
                                   : cloudStatus.isConfigured
-                                  ? (cloudStatus.error ? `Error: ${cloudStatus.error}` : 'Verifying connection to your Supabase tables...')
-                                  : "To sync controls between your device and Jojo's phone, connect your Supabase database below."}
+                                    ? (cloudStatus.error ? `Error: ${cloudStatus.error}` : 'Verifying connection to your Supabase tables...')
+                                    : "To sync controls between your device and Jojo's phone, connect your Supabase database below."}
                               </p>
                             </div>
                             <div className="flex gap-2 shrink-0">
@@ -2263,11 +2250,10 @@ ALTER TABLE public.site_settings ADD COLUMN IF NOT EXISTS lock_message text DEFA
                           </div>
 
                           {dbTestResult && (
-                            <div className={`p-3 rounded-xl text-xs border ${
-                              dbTestResult.success
-                                ? 'bg-emerald-500/15 border-emerald-500/30 text-emerald-300'
-                                : 'bg-red-500/15 border-red-500/30 text-red-300'
-                            }`}>
+                            <div className={`p-3 rounded-xl text-xs border ${dbTestResult.success
+                              ? 'bg-emerald-500/15 border-emerald-500/30 text-emerald-300'
+                              : 'bg-red-500/15 border-red-500/30 text-red-300'
+                              }`}>
                               {dbTestResult.success ? '✅ ' : '❌ '}
                               {dbTestResult.message}
                             </div>
@@ -2508,15 +2494,15 @@ ALTER TABLE public.site_settings ADD COLUMN IF NOT EXISTS lock_message text DEFA
             </AnimatePresence>
           </div>
 
-          {/* ── Right Panel: iPhone Preview ───────────────────────────────── */}
-          <aside className="w-[300px] shrink-0 bg-[#16151B] border-l border-white/8 p-4 flex flex-col items-center gap-4">
+          {/* ── Right Panel: iPhone Preview (hidden on mobile, available via Live Preview button) ── */}
+          <aside className="hidden xl:flex w-[300px] shrink-0 bg-[#16151B] border-l border-white/8 p-4 flex-col items-center gap-4">
             <div className="w-full text-center">
               <h3 className="text-xs font-semibold text-white">Live Preview</h3>
               <p className="text-[10px] text-white/40">(Jojo&apos;s Page)</p>
               <div className="mt-2 flex gap-2 justify-center flex-wrap">
                 <button
                   onClick={() => setSimulateUnlock(!simulateUnlock)}
-                  className="text-[10px] px-3 py-1 rounded-full border border-amber-400/30 text-amber-300 hover:bg-amber-400/10 transition-colors"
+                  className="text-[10px] px-3 py-1 rounded-full border border-amber-400/30 text-amber-300 hover:bg-amber-400/10 transition-colors cursor-pointer"
                 >
                   {simulateUnlock ? '🔓 Simulating Unlock' : '🔒 Simulate Unlock'}
                 </button>
@@ -2637,6 +2623,45 @@ ALTER TABLE public.site_settings ADD COLUMN IF NOT EXISTS lock_message text DEFA
           </aside>
         </div>
       </div>
+
+      {/* ── Mobile Bottom Navigation Bar (Fixed for Phone Use) ──────────── */}
+      <nav className="lg:hidden fixed bottom-0 left-0 right-0 z-40 bg-[#16151B]/95 backdrop-blur-xl border-t border-white/10 px-1 py-1.5 flex justify-around items-center shadow-2xl safe-area-pb">
+        {navItems.map((tab) => {
+          const isActive = activeNav === tab.id;
+          return (
+            <button
+              key={tab.id}
+              onClick={() => {
+                setActiveNav(tab.id);
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+              }}
+              className={`flex flex-col items-center justify-center py-1 px-2 rounded-xl transition-all relative cursor-pointer ${
+                isActive ? 'text-white' : 'text-white/45 hover:text-white/70'
+              }`}
+            >
+              <div
+                className={`p-1.5 rounded-xl transition-all ${
+                  isActive
+                    ? 'bg-gradient-to-tr from-rose-500/30 to-pink-500/20 text-[#F3D9C9]'
+                    : 'text-white/50'
+                }`}
+              >
+                <tab.icon size={18} />
+              </div>
+              <span className={`text-[10px] mt-0.5 tracking-tight ${isActive ? 'font-bold text-[#F3D9C9]' : 'font-medium'}`}>
+                {tab.id === 'dashboard' ? 'Overview' :
+                 tab.id === 'theme' ? 'Theme' :
+                 tab.id === 'events' ? 'Vault' :
+                 tab.id === 'media' ? 'Media' :
+                 tab.id === 'music' ? 'Music' : 'Settings'}
+              </span>
+              {isActive && (
+                <span className="w-1 h-1 rounded-full bg-[#D48C96] mt-0.5" />
+              )}
+            </button>
+          );
+        })}
+      </nav>
     </div>
   );
 }
