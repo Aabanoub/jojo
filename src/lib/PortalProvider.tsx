@@ -361,7 +361,12 @@ export function PortalProvider({ children }: { children: React.ReactNode }) {
           if (payload.eventType === 'INSERT' && payload.new) {
             const sig = payload.new as JojoSignal;
             const isSafety = typeof window !== 'undefined' && localStorage.getItem('jojo_safety_mode') === 'true';
-            const title = isSafety ? 'Love Alert 💕' : 'Love Signal from Our Space 💕';
+            const isFromBibo = sig.signal_type?.startsWith('bibo_') || sig.signal_type === 'push_alert';
+            const title = isSafety
+              ? 'Love Alert 💕'
+              : isFromBibo
+                ? `Love Signal from Bibo 💕`
+                : `Love Signal from Jojo 💕`;
             sendLoveNotification(title, {
               body: sig.message || 'You received a sweet love signal! ❤️',
               tag: 'signal-' + sig.id,

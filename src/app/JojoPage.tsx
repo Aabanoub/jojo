@@ -24,7 +24,7 @@ type TabId = 'home' | 'vault' | 'envelopes' | 'memories' | 'ping';
 
 export default function JojoPage() {
   const { state, sendSignal, upsertMemory, upsertAsset } = usePortal();
-  const { settings, events, envelopes, tracks, memories } = state;
+  const { settings, events, envelopes, tracks, memories, signals } = state;
 
   // ── Safety Mode State (Hides his name/nickname & her name/nickname across the web)
   const [isSafetyMode, setIsSafetyMode] = useState<boolean>(() => {
@@ -149,6 +149,24 @@ export default function JojoPage() {
   const [pingMessage, setPingMessage] = useState('');
   const [showPingSuccess, setShowPingSuccess] = useState(false);
   const [togetherStr, setTogetherStr] = useState('');
+
+  // Live Incoming Signals from Bibo
+  const [latestIncomingSignal, setLatestIncomingSignal] = useState<any | null>(null);
+  const prevSignalCountRef = useRef(signals.length);
+
+  useEffect(() => {
+    if (signals.length > prevSignalCountRef.current) {
+      const newest = signals[0];
+      if (newest && (newest.signal_type?.startsWith('bibo_') || newest.signal_type === 'push_alert')) {
+        setLatestIncomingSignal(newest);
+        const timer = setTimeout(() => setLatestIncomingSignal(null), 7000);
+        return () => clearTimeout(timer);
+      }
+    }
+    prevSignalCountRef.current = signals.length;
+  }, [signals]);
+
+  const biboSignals = signals.filter(s => s.signal_type?.startsWith('bibo_') || s.signal_type === 'push_alert');
 
   // Add Memory Modal State for Jojo
   const [showAddMemory, setShowAddMemory] = useState(false);
@@ -656,6 +674,42 @@ export default function JojoPage() {
                 ? 'Safety Button Active: All names & nicknames hidden'
                 : 'Safety Button Off: Names and nicknames restored'}
             </span>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Live Signal Popup from Bibo */}
+      <AnimatePresence>
+        {latestIncomingSignal && (
+          <motion.div
+            initial={{ opacity: 0, y: -30, scale: 0.92 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -20, scale: 0.92 }}
+            onClick={() => {
+              setActiveTab('ping');
+              setLatestIncomingSignal(null);
+            }}
+            className="fixed top-14 left-3 right-3 sm:left-auto sm:right-4 sm:max-w-xs z-50 p-3 rounded-2xl shadow-2xl border backdrop-blur-xl flex items-center gap-2.5 cursor-pointer"
+            style={{
+              background: 'linear-gradient(135deg, rgba(255, 245, 247, 0.97), rgba(254, 235, 240, 0.97))',
+              borderColor: '#FDA4AF',
+              boxShadow: '0 12px 36px rgba(225, 29, 72, 0.28)',
+            }}
+          >
+            <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-rose-500 to-pink-500 flex items-center justify-center text-white shrink-0 text-base shadow-xs animate-bounce">
+              ❤️
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-bold text-rose-800">
+                  {isSafetyMode ? 'Love Signal 💕' : `Love Signal from ${displayHisNick} 💕`}
+                </span>
+                <span className="text-[9px] text-rose-500 underline font-medium">Tap to reply</span>
+              </div>
+              <p className="text-xs text-[#44292E] font-medium truncate mt-0.5" dir="auto">
+                {isSafetyMode ? mask(latestIncomingSignal.message) : latestIncomingSignal.message}
+              </p>
+            </div>
           </motion.div>
         )}
       </AnimatePresence>
@@ -1508,6 +1562,42 @@ export default function JojoPage() {
                     ✨ Love signal sent {isSafetyMode ? 'successfully' : `to ${displayHisNick}`}! He&apos;ll see it right now 💕
                   </motion.p>
                 )}
+
+                {/* Signals Received from Bibo */}
+                <div className="mt-4 pt-3 border-t border-pink-200/60">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-[11px] font-semibold text-[#5D3A42] flex items-center gap-1">
+                      <span>💌</span>
+                      <span>{isSafetyMode ? 'Signals From Our Space' : `Signals from ${displayHisNick}`}</span>
+                    </span>
+                    <span className="text-[9px] text-[#A07A82] font-medium">{biboSignals.length} received</span>
+                  </div>
+
+                  {biboSignals.length === 0 ? (
+                    <p className="text-[10px] text-[#A07A82] text-center py-2 bg-white/40 rounded-xl">
+                      {isSafetyMode ? 'No signals yet 💕' : `Waiting for a sweet signal from ${displayHisNick} 💕`}
+                    </p>
+                  ) : (
+                    <div className="space-y-1.5 max-h-40 overflow-y-auto pr-1">
+                      {biboSignals.slice(0, 10).map((sig) => (
+                        <div
+                          key={sig.id}
+                          className="p-2 rounded-xl bg-white/80 border border-pink-100 flex items-start justify-between gap-2 shadow-2xs"
+                        >
+                          <div className="flex items-start gap-1.5 min-w-0">
+                            <span className="text-xs mt-0.5">❤️</span>
+                            <div className="min-w-0">
+                              <p className="text-xs text-[#44292E] font-medium leading-relaxed" dir="auto">
+                                {isSafetyMode ? mask(sig.message) : sig.message}
+                              </p>
+                              <ClientDate date={sig.created_at} className="text-[9px] text-[#A07A82] mt-0.5 block" />
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
               </motion.div>
             </motion.div>
           )}

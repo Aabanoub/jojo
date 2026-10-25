@@ -7,7 +7,7 @@ import {
   Bell, Edit2, Play, Pause, ChevronDown, RotateCw, Plus, Trash2,
   Save, Check, X, Heart, Menu, ExternalLink, SkipForward, SkipBack,
   AlertCircle, Globe, Key, Calendar, User, FileText, Volume2, Upload, Copy,
-  Sparkles, Star, Camera,
+  Sparkles, Star, Camera, Send,
 } from 'lucide-react';
 import { usePortal } from '@/lib/PortalProvider';
 import { uploadFile, uploadFileDetailed, BUCKETS, isSupabaseConfigured, getSupabaseCredentials, compressImage, getSupabase, resolveSupabaseCloud } from '@/lib/supabase';
@@ -140,6 +140,8 @@ export default function HostPage() {
   const [alertText, setAlertText] = useState('');
   const [sendingAlert, setSendingAlert] = useState(false);
   const [alertSentSuccess, setAlertSentSuccess] = useState(false);
+  const [signalFilter, setSignalFilter] = useState<'all' | 'from_jojo' | 'from_bibo'>('all');
+  const signalEditorRef = useRef<HTMLDivElement>(null);
 
   const handleSendPushAlert = async (msgToSend?: string) => {
     const text = (msgToSend || alertText).trim();
@@ -762,6 +764,20 @@ export default function HostPage() {
           )}
 
           <div className="flex items-center gap-2.5">
+            {/* Quick Ping Jojo button */}
+            <button
+              onClick={() => {
+                setActiveNav('dashboard');
+                setTimeout(() => {
+                  signalEditorRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                }, 100);
+              }}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold bg-rose-500/20 text-rose-300 border border-rose-500/40 hover:bg-rose-500/30 transition-all cursor-pointer shadow-xs active:scale-95"
+            >
+              <Heart size={12} className="text-rose-400 fill-rose-400 animate-pulse" />
+              <span>Ping Jojo</span>
+            </button>
+
             {/* Lock Jojo's Page Header Button */}
             <button
               onClick={toggleLockJojoPage}
@@ -1207,38 +1223,183 @@ ALTER TABLE public.site_settings ADD COLUMN IF NOT EXISTS lock_message text DEFA
                       </div>
                     </Panel>
 
-                    {/* Signal Feed */}
-                    <Panel title="Jojo&apos;s Signals" sub="Live Feed">
-                      {signals.length === 0 ? (
-                        <p className="text-xs text-white/30 text-center py-4">No signals yet from Jojo 💕</p>
-                      ) : (
-                        <div className="space-y-2 max-h-80 overflow-y-auto">
-                          {signals.map((sig) => (
-                            <div
-                              key={sig.id}
-                              className={`p-3 rounded-xl flex items-start justify-between gap-3 ${
-                                sig.is_read ? 'bg-[#282632] border border-white/6' : 'bg-rose-500/10 border border-rose-500/30'
-                              }`}
+                    {/* Love Signals Hub (Live 2-Way Station) */}
+                    <Panel title="Love Signals & Pings" sub="Live 2-Way Station">
+                      <div ref={signalEditorRef} className="p-3.5 rounded-xl bg-[#282632] border border-white/6 mb-3.5">
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="text-xs font-semibold text-white flex items-center gap-1.5">
+                            <Heart size={13} className="text-rose-400 fill-rose-400" />
+                            <span>Ping Jojo</span>
+                            <span className="text-[10px] font-normal text-rose-300/80">(Send Live Signal to Her Phone 📱)</span>
+                          </span>
+                          {alertSentSuccess && (
+                            <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 text-[10px] font-medium flex items-center gap-1 animate-fade-in">
+                              <Check size={11} /> Sent to Jojo!
+                            </span>
+                          )}
+                        </div>
+
+                        {/* Quick Signal Preset Cards */}
+                        <div className="grid grid-cols-2 gap-1.5 mb-2.5">
+                          {[
+                            { label: 'وحشتيني اوي ❤️', text: 'وحشتيني اوي اوي يا روحي ❤️', emoji: '❤️' },
+                            { label: 'Thinking of you ✨', text: 'Thinking of you every single second my Jojo ✨', emoji: '✨' },
+                            { label: 'بموت فيكي يا كتكوتة 🐣', text: 'بموت فيكي يا كتكوتة يا أجمل حاجة في حياتي 🐣', emoji: '🐣' },
+                            { label: 'I Love You 💕', text: 'I love you more than words could ever say 💕', emoji: '💕' },
+                            { label: 'Check our space! 💌', text: 'افتحي الـ Love Space بتاعنا في مفاجأة جديدة عشانك! 💌', emoji: '💌' },
+                            { label: 'Good Luck 🍀', text: 'ربنا معاكي ويوفقك يا أحلى بنوتة في الكون 🍀❤️', emoji: '🍀' },
+                          ].map((preset, idx) => (
+                            <button
+                              key={idx}
+                              type="button"
+                              disabled={sendingAlert}
+                              onClick={() => handleSendPushAlert(preset.text)}
+                              className="text-left p-2 rounded-xl bg-white/5 hover:bg-rose-500/20 border border-white/10 hover:border-rose-500/30 transition-all text-[11px] text-white/85 hover:text-white flex items-center gap-1.5 active:scale-98 cursor-pointer disabled:opacity-50"
                             >
-                              <div className="flex items-start gap-2">
-                                <span className="text-base">{sig.signal_type === 'heart' ? '❤️' : '💌'}</span>
-                                <div>
-                                  <p className="text-xs text-white/90" dir="auto">{sig.message}</p>
-                                  <ClientDate date={sig.created_at} className="text-[10px] text-white/40 mt-0.5 block" />
-                                </div>
-                              </div>
-                              {!sig.is_read && (
-                                <button
-                                  onClick={() => markSignalRead(sig.id)}
-                                  className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 shrink-0 hover:bg-emerald-500/30"
-                                >
-                                  Mark Read
-                                </button>
-                              )}
-                            </div>
+                              <span>{preset.emoji}</span>
+                              <span className="truncate">{preset.label}</span>
+                            </button>
                           ))}
                         </div>
-                      )}
+
+                        {/* Custom Signal Input */}
+                        <div className="flex gap-2">
+                          <input
+                            type="text"
+                            value={alertText}
+                            onChange={(e) => setAlertText(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter' && !sendingAlert && alertText.trim()) {
+                                handleSendPushAlert();
+                              }
+                            }}
+                            placeholder="Type a custom signal for Jojo (اكتب إشارة حب خاصة توصل لموبايلها)..."
+                            className="flex-1 px-3 py-2 rounded-xl bg-[#1E1D24] border border-white/10 text-xs text-white placeholder-white/30 outline-none focus:border-rose-400/50 transition-colors"
+                          />
+                          <button
+                            type="button"
+                            disabled={sendingAlert || !alertText.trim()}
+                            onClick={() => handleSendPushAlert()}
+                            className="px-3.5 py-2 rounded-xl bg-gradient-to-r from-rose-500 to-pink-500 hover:from-rose-600 text-white text-xs font-semibold shadow-sm transition-all cursor-pointer disabled:opacity-40 flex items-center gap-1.5 active:scale-95 shrink-0"
+                          >
+                            {sendingAlert ? (
+                              <RotateCw size={13} className="animate-spin" />
+                            ) : (
+                              <Send size={13} />
+                            )}
+                            <span>Send</span>
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Filter Tabs for Signals Feed */}
+                      <div className="flex items-center justify-between gap-2 mb-2 pb-1 border-b border-white/5 text-[11px]">
+                        <div className="flex items-center gap-1">
+                          {(['all', 'from_jojo', 'from_bibo'] as const).map((filter) => {
+                            const count =
+                              filter === 'all'
+                                ? signals.length
+                                : filter === 'from_jojo'
+                                ? signals.filter(s => !s.signal_type?.startsWith('bibo_') && s.signal_type !== 'push_alert').length
+                                : signals.filter(s => s.signal_type?.startsWith('bibo_') || s.signal_type === 'push_alert').length;
+                            const labels = {
+                              all: 'All',
+                              from_jojo: 'From Jojo 💕',
+                              from_bibo: 'Sent by You 💌',
+                            };
+                            return (
+                              <button
+                                key={filter}
+                                onClick={() => setSignalFilter(filter)}
+                                className={`px-2.5 py-1 rounded-lg transition-all cursor-pointer ${
+                                  signalFilter === filter
+                                    ? 'bg-rose-500/25 text-rose-300 font-semibold border border-rose-500/30'
+                                    : 'text-white/40 hover:text-white/70 hover:bg-white/5'
+                                }`}
+                              >
+                                {labels[filter]} ({count})
+                              </button>
+                            );
+                          })}
+                        </div>
+                        {signals.some(s => !s.is_read) && (
+                          <button
+                            onClick={() => signals.forEach(s => !s.is_read && markSignalRead(s.id))}
+                            className="text-[10px] text-rose-300/80 hover:text-rose-200 underline cursor-pointer"
+                          >
+                            Mark all read
+                          </button>
+                        )}
+                      </div>
+
+                      {/* Signals List */}
+                      {(() => {
+                        const filtered = signals.filter(s => {
+                          const isFromBibo = s.signal_type?.startsWith('bibo_') || s.signal_type === 'push_alert';
+                          if (signalFilter === 'from_jojo') return !isFromBibo;
+                          if (signalFilter === 'from_bibo') return isFromBibo;
+                          return true;
+                        });
+
+                        if (filtered.length === 0) {
+                          return (
+                            <p className="text-xs text-white/30 text-center py-5">
+                              {signalFilter === 'from_jojo'
+                                ? 'No signals from Jojo yet 💕'
+                                : signalFilter === 'from_bibo'
+                                ? 'No signals sent by you yet 💌'
+                                : 'No signals exchanged yet 💕'}
+                            </p>
+                          );
+                        }
+
+                        return (
+                          <div className="space-y-2 max-h-80 overflow-y-auto pr-1">
+                            {filtered.map((sig) => {
+                              const isFromBibo = sig.signal_type?.startsWith('bibo_') || sig.signal_type === 'push_alert';
+                              return (
+                                <div
+                                  key={sig.id}
+                                  className={`p-3 rounded-xl flex items-start justify-between gap-3 transition-all ${
+                                    isFromBibo
+                                      ? 'bg-[#23202C] border border-rose-500/20'
+                                      : sig.is_read
+                                      ? 'bg-[#282632] border border-white/6'
+                                      : 'bg-rose-500/10 border border-rose-500/30 ring-1 ring-rose-500/20'
+                                  }`}
+                                >
+                                  <div className="flex items-start gap-2.5 min-w-0">
+                                    <div className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 text-sm ${
+                                      isFromBibo ? 'bg-purple-500/20 text-purple-300' : 'bg-pink-500/20 text-pink-300'
+                                    }`}>
+                                      {isFromBibo ? '💌' : sig.signal_type === 'camera' ? '📷' : '❤️'}
+                                    </div>
+                                    <div className="min-w-0">
+                                      <div className="flex items-center gap-1.5 mb-0.5">
+                                        <span className={`text-[10px] font-bold ${isFromBibo ? 'text-purple-300' : 'text-rose-300'}`}>
+                                          {isFromBibo ? 'You (Sent to Her)' : (settings.her_nickname || 'Jojo')}
+                                        </span>
+                                        <ClientDate date={sig.created_at} className="text-[9px] text-white/30" />
+                                      </div>
+                                      <p className="text-xs text-white/90 leading-relaxed break-words" dir="auto">
+                                        {sig.message}
+                                      </p>
+                                    </div>
+                                  </div>
+                                  {!sig.is_read && !isFromBibo && (
+                                    <button
+                                      onClick={() => markSignalRead(sig.id)}
+                                      className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 shrink-0 hover:bg-emerald-500/30 cursor-pointer"
+                                    >
+                                      Mark Read
+                                    </button>
+                                  )}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        );
+                      })()}
                     </Panel>
 
                     {/* Quick Actions */}
